@@ -1,6 +1,7 @@
+from android_sms_gateway.enums import WebhookEvent
 import pytest
 
-from android_sms_gateway.domain import MessageState, RecipientState
+from android_sms_gateway.domain import MessageState, RecipientState, Webhook
 
 
 # Test for successful instantiation from a dictionary
@@ -79,3 +80,58 @@ def test_message_state_from_dict_incorrect_types():
         Exception
     ):  # Replace Exception with the specific exception you expect
         MessageState.from_dict(incorrect_payload)
+
+
+def test_webhook_from_dict():
+    """
+    Tests that a Webhook instance can be successfully instantiated from a dictionary
+    representation of a webhook.
+    """
+    payload = {
+        "id": "webhook_123",
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    webhook = Webhook.from_dict(payload)
+
+    assert webhook.id == payload["id"]
+    assert webhook.url == payload["url"]
+    assert webhook.event == WebhookEvent(payload["event"])
+
+
+def test_webhook_asdict():
+    """
+    Tests that a Webhook instance can be successfully converted to a dictionary
+    representation and that the fields match the expected values.
+
+    This test ensures that the asdict method of the Webhook class returns a dictionary
+    with the correct keys and values.
+    """
+    webhook = Webhook(
+        id="webhook_123",
+        url="https://example.com/webhook",
+        event=WebhookEvent.SMS_RECEIVED,
+    )
+
+    expected_dict = {
+        "id": "webhook_123",
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    assert webhook.asdict() == expected_dict
+
+    webhook = Webhook(
+        id=None,
+        url="https://example.com/webhook",
+        event=WebhookEvent.SMS_RECEIVED,
+    )
+
+    expected_dict = {
+        "id": None,
+        "url": "https://example.com/webhook",
+        "event": "sms:received",
+    }
+
+    assert webhook.asdict() == expected_dict

@@ -6,7 +6,7 @@ VERSION=$(shell grep '__version__' $(PACKAGE_NAME)/__init__.py | cut -d '"' -f 2
 
 # Install pipenv and project dependencies
 install:
-	pipenv install --dev
+	pipenv install --dev --categories encryption
 
 # Run tests with pytest or unittest
 test:

@@ -13,6 +13,19 @@ class HttpClient(t.Protocol):
         self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
     ) -> dict: ...
 
+    @abc.abstractmethod
+    def delete(self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None) -> None:
+        """
+        Sends a DELETE request to the specified URL.
+
+        Args:
+            url: The URL to send the DELETE request to.
+            headers: Optional dictionary of HTTP headers to send with the request.
+
+        Returns:
+            None
+        """
+
     def __enter__(self):
         pass
 
