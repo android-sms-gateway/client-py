@@ -114,6 +114,26 @@ class APIClient(BaseClient):
             )
         )
 
+    def get_webhooks(self) -> t.List[domain.Webhook]:
+        return [
+            domain.Webhook.from_dict(webhook)
+            for webhook in self.http.get(
+                f"{self.base_url}/webhooks", headers=self.headers
+            )
+        ]
+
+    def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
+        return domain.Webhook.from_dict(
+            self.http.post(
+                f"{self.base_url}/webhooks",
+                payload=webhook.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    def delete_webhook(self, _id: str) -> None:
+        self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
+
 
 class AsyncAPIClient(BaseClient):
     def __init__(
