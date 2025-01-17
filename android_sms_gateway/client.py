@@ -82,20 +82,27 @@ class APIClient(BaseClient):
     ) -> None:
         super().__init__(login, password, base_url=base_url, encryptor=encryptor)
         self.http = http
+        self.default_http = None
 
     def __enter__(self):
         if self.http is not None:
-            raise ValueError("HTTP client already initialized")
+            return self
 
-        self.http = http.get_client().__enter__()
+        self.http = self.default_http = http.get_client().__enter__()
 
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.http.__exit__(exc_type, exc_val, exc_tb)
-        self.http = None
+        if self.default_http is None:
+            return
+
+        self.default_http.__exit__(exc_type, exc_val, exc_tb)
+        self.http = self.default_http = None
 
     def send(self, message: domain.Message) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         message = self._encrypt(message)
         return self._decrypt(
             domain.MessageState.from_dict(
@@ -108,6 +115,9 @@ class APIClient(BaseClient):
         )
 
     def get_state(self, _id: str) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         return self._decrypt(
             domain.MessageState.from_dict(
                 self.http.get(f"{self.base_url}/message/{_id}", headers=self.headers)
@@ -115,6 +125,15 @@ class APIClient(BaseClient):
         )
 
     def get_webhooks(self) -> t.List[domain.Webhook]:
+        """
+        Retrieves a list of all webhooks registered for the account.
+
+        Returns:
+            A list of Webhook instances.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         return [
             domain.Webhook.from_dict(webhook)
             for webhook in self.http.get(
@@ -123,6 +142,18 @@ class APIClient(BaseClient):
         ]
 
     def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
+        """
+        Creates a new webhook.
+
+        Args:
+            webhook: The webhook to create.
+
+        Returns:
+            The created webhook.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         return domain.Webhook.from_dict(
             self.http.post(
                 f"{self.base_url}/webhooks",
@@ -132,6 +163,18 @@ class APIClient(BaseClient):
         )
 
     def delete_webhook(self, _id: str) -> None:
+        """
+        Deletes a webhook.
+
+        Args:
+            _id: The ID of the webhook to delete.
+
+        Returns:
+            None
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
 
 
@@ -147,20 +190,27 @@ class AsyncAPIClient(BaseClient):
     ) -> None:
         super().__init__(login, password, base_url=base_url, encryptor=encryptor)
         self.http = http_client
+        self.default_http = None
 
     async def __aenter__(self):
         if self.http is not None:
-            raise ValueError("HTTP client already initialized")
+            return self
 
-        self.http = await ahttp.get_client().__aenter__()
+        self.http = self.default_http = await ahttp.get_client().__aenter__()
 
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.http.__aexit__(exc_type, exc_val, exc_tb)
-        self.http = None
+        if self.default_http is None:
+            return
+
+        await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
+        self.http = self.default_http = None
 
     async def send(self, message: domain.Message) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         message = self._encrypt(message)
         return self._decrypt(
             domain.MessageState.from_dict(
@@ -173,6 +223,9 @@ class AsyncAPIClient(BaseClient):
         )
 
     async def get_state(self, _id: str) -> domain.MessageState:
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
         return self._decrypt(
             domain.MessageState.from_dict(
                 await self.http.get(
@@ -180,3 +233,56 @@ class AsyncAPIClient(BaseClient):
                 )
             )
         )
+
+    async def get_webhooks(self) -> t.List[domain.Webhook]:
+        """
+        Retrieves a list of all webhooks registered for the account.
+
+        Returns:
+            A list of Webhook instances.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return [
+            domain.Webhook.from_dict(webhook)
+            for webhook in await self.http.get(
+                f"{self.base_url}/webhooks", headers=self.headers
+            )
+        ]
+
+    async def create_webhook(self, webhook: domain.Webhook) -> domain.Webhook:
+        """
+        Creates a new webhook.
+
+        Args:
+            webhook: The webhook to create.
+
+        Returns:
+            The created webhook.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.Webhook.from_dict(
+            await self.http.post(
+                f"{self.base_url}/webhooks",
+                payload=webhook.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    async def delete_webhook(self, _id: str) -> None:
+        """
+        Deletes a webhook.
+
+        Args:
+            _id: The ID of the webhook to delete.
+
+        Returns:
+            None
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        await self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)

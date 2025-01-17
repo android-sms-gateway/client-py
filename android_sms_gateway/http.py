@@ -51,12 +51,18 @@ try:
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
+            if self._session is None:
+                return
+
             self._session.close()
             self._session = None
 
         def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
             return self._process_response(self._session.get(url, headers=headers))
 
         def post(
@@ -66,9 +72,20 @@ try:
             *,
             headers: t.Optional[t.Dict[str, str]] = None,
         ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
             return self._process_response(
                 self._session.post(url, headers=headers, json=payload)
             )
+
+        def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            self._session.delete(url, headers=headers).raise_for_status()
 
         def _process_response(self, response: requests.Response) -> dict:
             response.raise_for_status()
@@ -94,12 +111,18 @@ try:
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
+            if self._client is None:
+                return
+
             self._client.close()
             self._client = None
 
         def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
             return self._client.get(url, headers=headers).raise_for_status().json()
 
         def post(
@@ -109,11 +132,22 @@ try:
             *,
             headers: t.Optional[t.Dict[str, str]] = None,
         ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
             return (
                 self._client.post(url, headers=headers, json=payload)
                 .raise_for_status()
                 .json()
             )
+
+        def delete(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> None:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            self._client.delete(url, headers=headers).raise_for_status()
 
     DEFAULT_CLIENT = HttpxHttpClient
 except ImportError:

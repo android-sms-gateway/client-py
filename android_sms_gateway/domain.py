@@ -87,7 +87,7 @@ class Webhook:
             A Webhook instance.
         """
         return cls(
-            id=payload["id"],
+            id=payload.get("id"),
             url=payload["url"],
             event=WebhookEvent(payload["event"]),
         )

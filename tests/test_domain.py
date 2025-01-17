@@ -1,6 +1,6 @@
-from android_sms_gateway.enums import WebhookEvent
 import pytest
 
+from android_sms_gateway.enums import WebhookEvent
 from android_sms_gateway.domain import MessageState, RecipientState, Webhook
 
 
