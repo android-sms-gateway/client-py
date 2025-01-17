@@ -28,7 +28,7 @@ Optional:
 pip install android_sms_gateway
 ```
 
-You can also install with preferred http client:
+You can also install it with the preferred HTTP client:
 
 ```bash
 pip install android_sms_gateway[requests]
@@ -101,20 +101,28 @@ implement the same interface and can be used as context managers.
 
 ### Methods
 
-There are two methods:
+There are two groups of methods:
+
+**Messages**
 
 - `send(message: domain.Message) -> domain.MessageState`: Send a new SMS message.
 - `get_state(_id: str) -> domain.MessageState`: Retrieve the state of a previously sent message by its ID.
 
+**Webhooks**
+
+- `get_webhooks() -> list[domain.Webhook]`: Retrieve a list of all webhooks registered for the account.
+- `create_webhook(webhook: domain.Webhook) -> domain.Webhook`: Create a new webhook.
+- `delete_webhook(_id: str)`: Delete a webhook by its ID.
+
 ## HTTP Client
 
-The API clients abstract away the HTTP client used to make requests. The library includes support for some popular HTTP clients and trys to discover them automatically:
+The API clients abstract away the HTTP client used to make requests. The library includes support for some popular HTTP clients and tries to discover them automatically:
 
 - [requests](https://pypi.org/project/requests/) - `APIClient` only
 - [aiohttp](https://pypi.org/project/aiohttp/) - `AsyncAPIClient` only
 - [httpx](https://pypi.org/project/httpx/) - `APIClient` and `AsyncAPIClient`
 
-Also you can implement your own HTTP client that conforms to the `http.HttpClient` or `ahttp.HttpClient` protocol.
+You can also implement your own HTTP client that conforms to the `http.HttpClient` or `ahttp.HttpClient` protocol.
 
 # Contributing
 
