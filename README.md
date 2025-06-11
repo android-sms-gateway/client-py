@@ -39,7 +39,7 @@ A modern Python client for seamless integration with the [SMS Gateway for Androi
 - **Type Hinting**: Fully typed for better development experience
 
 ## ⚙️ Requirements
-- Python 3.7+
+- Python 3.9+
 - Choose one HTTP client:
   - 🚀 [requests](https://pypi.org/project/requests/) (sync)
   - ⚡ [aiohttp](https://pypi.org/project/aiohttp/) (async)
