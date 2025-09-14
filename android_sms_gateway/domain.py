@@ -1,7 +1,7 @@
 import dataclasses
 import typing as t
 
-from .enums import ProcessState, WebhookEvent
+from .enums import ProcessState, WebhookEvent, MessagePriority
 
 
 def snake_to_camel(snake_str):
@@ -11,6 +11,20 @@ def snake_to_camel(snake_str):
 
 @dataclasses.dataclass(frozen=True)
 class Message:
+    """
+    Represents an SMS message.
+
+    Attributes:
+        message (str): The message text.
+        phone_numbers (List[str]): A list of phone numbers to send the message to.
+        with_delivery_report (bool): Whether to request a delivery report. Defaults to True.
+        is_encrypted (bool): Whether the message is encrypted. Defaults to False.
+        id (Optional[str]): The message ID. Defaults to None.
+        ttl (Optional[int]): The time-to-live in seconds. Defaults to None.
+        sim_number (Optional[int]): The SIM number to use. Defaults to None.
+        priority (Optional[MessagePriority]): The priority of the message. Defaults to None.
+    """
+
     message: str
     phone_numbers: t.List[str]
     with_delivery_report: bool = True
@@ -19,8 +33,15 @@ class Message:
     id: t.Optional[str] = None
     ttl: t.Optional[int] = None
     sim_number: t.Optional[int] = None
+    priority: t.Optional[MessagePriority] = None
 
     def asdict(self) -> t.Dict[str, t.Any]:
+        """
+        Returns a dictionary representation of the message.
+
+        Returns:
+            Dict[str, Any]: A dictionary representation of the message.
+        """
         return {
             snake_to_camel(field.name): getattr(self, field.name)
             for field in dataclasses.fields(self)
