@@ -1,7 +1,7 @@
 import pytest
 
-from android_sms_gateway.enums import WebhookEvent
-from android_sms_gateway.domain import MessageState, RecipientState, Webhook
+from android_sms_gateway.enums import WebhookEvent, MessagePriority
+from android_sms_gateway.domain import MessageState, RecipientState, Webhook, Message
 
 
 # Test for successful instantiation from a dictionary
@@ -135,3 +135,127 @@ def test_webhook_asdict():
     }
 
     assert webhook.asdict() == expected_dict
+
+
+@pytest.mark.parametrize(
+    "message_content,phone_numbers,with_delivery_report,is_encrypted,id,ttl,sim_number,priority,expected",
+    [
+        (
+            "Hello, world!",
+            ["123", "456"],
+            True,
+            False,
+            "msg_123",
+            300,
+            1,
+            MessagePriority.BYPASS_THRESHOLD,
+            {
+                "message": "Hello, world!",
+                "phoneNumbers": ["123", "456"],
+                "withDeliveryReport": True,
+                "isEncrypted": False,
+                "id": "msg_123",
+                "ttl": 300,
+                "simNumber": 1,
+                "priority": 100,
+            },
+        ),
+        (
+            "Hello, world!",
+            ["123", "456"],
+            True,
+            False,
+            None,
+            None,
+            None,
+            None,
+            {
+                "message": "Hello, world!",
+                "phoneNumbers": ["123", "456"],
+                "withDeliveryReport": True,
+                "isEncrypted": False,
+            },
+        ),
+        (
+            "Hello, world!",
+            ["123", "456"],
+            True,
+            False,
+            "msg_123",
+            None,
+            1,
+            None,
+            {
+                "message": "Hello, world!",
+                "phoneNumbers": ["123", "456"],
+                "withDeliveryReport": True,
+                "isEncrypted": False,
+                "id": "msg_123",
+                "simNumber": 1,
+            },
+        ),
+        (
+            "Hello, world!",
+            ["123", "456"],
+            True,
+            False,
+            "msg_123",
+            None,
+            None,
+            MessagePriority.DEFAULT,
+            {
+                "message": "Hello, world!",
+                "phoneNumbers": ["123", "456"],
+                "withDeliveryReport": True,
+                "isEncrypted": False,
+                "id": "msg_123",
+                "priority": 0,
+            },
+        ),
+        (
+            "Hi",
+            ["555"],
+            True,
+            False,
+            None,
+            None,
+            None,
+            MessagePriority.MINIMUM,
+            {
+                "message": "Hi",
+                "phoneNumbers": ["555"],
+                "withDeliveryReport": True,
+                "isEncrypted": False,
+                "priority": -128,
+            },
+        ),
+    ],
+)
+def test_message_asdict(
+    message_content,
+    phone_numbers,
+    with_delivery_report,
+    is_encrypted,
+    id,
+    ttl,
+    sim_number,
+    priority,
+    expected,
+):
+    """
+    Tests that a Message instance can be successfully converted to a dictionary
+    representation with camelCase keys and that only non-None fields are included.
+    Uses parametrized testing to cover multiple scenarios.
+    """
+    message = Message(
+        message=message_content,
+        phone_numbers=phone_numbers,
+        with_delivery_report=with_delivery_report,
+        is_encrypted=is_encrypted,
+        id=id,
+        ttl=ttl,
+        sim_number=sim_number,
+        priority=priority,
+    )
+
+    assert message.asdict() == expected
