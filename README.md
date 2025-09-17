@@ -4,29 +4,32 @@
 [![PyPI Version](https://img.shields.io/pypi/v/android-sms-gateway.svg?style=for-the-badge)](https://pypi.org/project/android-sms-gateway/)
 [![Python Version](https://img.shields.io/pypi/pyversions/android-sms-gateway.svg?style=for-the-badge)](https://pypi.org/project/android-sms-gateway/)
 [![Downloads](https://img.shields.io/pypi/dm/android-sms-gateway.svg?style=for-the-badge)](https://pypi.org/project/android-sms-gateway/)
-[![GitHub Issues](https://img.shields.io/github/issues/capcom6/android-sms-gateway-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/issues)
-[![GitHub Stars](https://img.shields.io/github/stars/capcom6/android-sms-gateway-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/capcom6/android-sms-gateway-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/network)
+[![GitHub Issues](https://img.shields.io/github/issues/android-sms-gateway/client-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/android-sms-gateway/client-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/android-sms-gateway/client-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/network)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/android-sms-gateway/client-py?style=for-the-badge)](https://www.coderabbit.ai)
 
 A modern Python client for seamless integration with the [SMS Gateway for Android](https://sms-gate.app) API. Send SMS messages programmatically through your Android devices with this powerful yet simple-to-use library.
 
-## ✨ Features
+## 📖 About The Project
 
-- 🚀 **Dual Client**: Supports both synchronous (`APIClient`) and asynchronous (`AsyncAPIClient`) interfaces
-- 🔒 **End-to-End Encryption**: Optional message encryption using AES-256-CBC
-- 🌐 **Multiple HTTP Backends**: Native support for `requests`, `aiohttp`, and `httpx`
-- 🔗 **Webhook Management**: Programmatically create, query, and delete webhooks
-- ⚙️ **Customizable Base URL**: Point to different API endpoints
-- 📝 **Full Type Hinting**: Fully typed for better development experience
-- 🛡️ **Robust Error Handling**: Specific exceptions and clear error messages
-- 📊 **Delivery Reports**: Track your message delivery status
+The Python client for SMSGate provides a clean, type-safe interface to interact with the SMSGate API. It's designed specifically for Python developers who need to integrate SMS functionality into their applications with minimal setup and maximum reliability.
 
-## 📖 Table of Contents
+Key value propositions:
 
+- 🐍 **Pythonic API** - Designed with Python conventions and best practices in mind
+- 🛡️ **Robust Security** - Guidance for secure credential handling and optional end‑to‑end encryption
+- 🔄 **Flexible Architecture** - Supports both synchronous and asynchronous programming patterns
+- 💻 **Type Safety** - Full type hinting for better developer experience and fewer runtime errors
+- 🔗 **Webhook Integration** - Simplified webhook management for event-driven architectures
+
+This client abstracts away the complexities of the underlying HTTP API while providing all the necessary functionality to send and track SMS messages through Android devices.
+
+## 📚 Table of Contents
 - [📱 SMS Gateway for Android™ Python API Client](#-sms-gateway-for-android-python-api-client)
+  - [📖 About The Project](#-about-the-project)
+  - [📚 Table of Contents](#-table-of-contents)
   - [✨ Features](#-features)
-  - [📖 Table of Contents](#-table-of-contents)
   - [⚙️ Requirements](#️-requirements)
   - [📦 Installation](#-installation)
     - [Basic Installation](#basic-installation)
@@ -55,6 +58,18 @@ A modern Python client for seamless integration with the [SMS Gateway for Androi
     - [Pull Request Checklist](#pull-request-checklist)
   - [📄 License](#-license)
   - [🤝 Support](#-support)
+
+
+## ✨ Features
+
+- 🔄 **Dual Client**: Supports both synchronous (`APIClient`) and asynchronous (`AsyncAPIClient`) interfaces
+- 🔒 **End-to-End Encryption**: Optional message encryption using AES-256-CBC
+- 🌐 **Multiple HTTP Backends**: Native support for `requests`, `aiohttp`, and `httpx`
+- 🔗 **Webhook Management**: Programmatically create, query, and delete webhooks
+- ⚙️ **Customizable Base URL**: Point to different API endpoints
+- 💻 **Full Type Hinting**: Fully typed for better development experience
+- ⚠️ **Robust Error Handling**: Specific exceptions and clear error messages
+- 📈 **Delivery Reports**: Track your message delivery status
 
 ## ⚙️ Requirements
 
@@ -180,13 +195,13 @@ with client.APIClient(login, password, encryptor=encryptor) as c:
 
 Both clients (`APIClient` and `AsyncAPIClient`) support these parameters:
 
-| Parameter   | Type         | Description         | Default                                  |
-| ----------- | ------------ | ------------------- | ---------------------------------------- |
-| `login`     | `str`        | API username        | **Required**                             |
-| `password`  | `str`        | API password        | **Required**                             |
-| `base_url`  | `str`        | API base URL        | `"https://api.sms-gate.app/3rdparty/v1"` |
-| `encryptor` | `Encryptor`  | Encryption instance | `None`                                   |
-| `http`      | `HttpClient` | Custom HTTP client  | Auto-detected                            |
+| Parameter   | Type                           | Description         | Default                                  |
+| ----------- | ------------------------------ | ------------------- | ---------------------------------------- |
+| `login`     | `str`                          | API username        | **Required**                             |
+| `password`  | `str`                          | API password        | **Required**                             |
+| `base_url`  | `str`                          | API base URL        | `"https://api.sms-gate.app/3rdparty/v1"` |
+| `encryptor` | `Encryptor`                    | Encryption instance | `None`                                   |
+| `http`      | `HttpClient`/`AsyncHttpClient` | Custom HTTP client  | Auto-detected                            |
 
 ### Available Methods
 
@@ -250,7 +265,7 @@ The library automatically detects installed HTTP clients with this priority:
 ### Using Specific Clients
 
 ```python
-from android_sms_gateway import http
+from android_sms_gateway import client, http
 
 # Force httpx usage
 client.APIClient(..., http=http.HttpxHttpClient())
@@ -265,7 +280,7 @@ async with client.AsyncAPIClient(..., http=http.AiohttpHttpClient()) as c:
 
 ### Custom HTTP Client
 
-Implement your own HTTP client following the `http.HttpClient` or `ahttp.HttpClient` protocols.
+Implement your own HTTP client following the `http.HttpClient` (sync) or `ahttp.AsyncHttpClient` (async) protocols.
 
 ## 🔒 Security
 
