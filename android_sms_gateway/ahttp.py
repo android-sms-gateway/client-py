@@ -1,6 +1,10 @@
 import abc
 import typing as t
 
+from .errors import (
+    error_from_status,
+)
+
 
 class AsyncHttpClient(t.Protocol):
     @abc.abstractmethod
@@ -70,6 +74,23 @@ try:
             await self._session.close()
             self._session = None
 
+        async def _process_response(self, response: aiohttp.ClientResponse) -> dict:
+            try:
+                response.raise_for_status()
+                return await response.json()
+            except aiohttp.ClientResponseError as e:
+                # Extract error message from response if available
+                error_data = {}
+                try:
+                    error_data = await response.json()
+                except ValueError:
+                    # Response is not JSON
+                    pass
+
+                # Use the error mapping to create appropriate exception
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(error_message, response.status, error_data)
+
         async def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> dict:
@@ -77,8 +98,7 @@ try:
                 raise ValueError("Session not initialized")
 
             async with self._session.get(url, headers=headers) as response:
-                response.raise_for_status()
-                return await response.json()
+                return await self._process_response(response)
 
         async def post(
             self,
@@ -93,8 +113,7 @@ try:
             async with self._session.post(
                 url, headers=headers, json=payload
             ) as response:
-                response.raise_for_status()
-                return await response.json()
+                return await self._process_response(response)
 
         async def put(
             self,
@@ -109,8 +128,7 @@ try:
             async with self._session.put(
                 url, headers=headers, json=payload
             ) as response:
-                response.raise_for_status()
-                return await response.json()
+                return await self._process_response(response)
 
         async def patch(
             self,
@@ -125,8 +143,7 @@ try:
             async with self._session.patch(
                 url, headers=headers, json=payload
             ) as response:
-                response.raise_for_status()
-                return await response.json()
+                return await self._process_response(response)
 
         async def delete(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
@@ -135,7 +152,7 @@ try:
                 raise ValueError("Session not initialized")
 
             async with self._session.delete(url, headers=headers) as response:
-                response.raise_for_status()
+                await self._process_response(response)
 
     DEFAULT_CLIENT = AiohttpAsyncHttpClient
 except ImportError:
@@ -163,6 +180,23 @@ try:
             await self._client.aclose()
             self._client = None
 
+        async def _process_response(self, response: httpx.Response) -> dict:
+            try:
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                # Extract error message from response if available
+                error_data = {}
+                try:
+                    error_data = response.json()
+                except ValueError:
+                    # Response is not JSON
+                    pass
+
+                # Use the error mapping to create appropriate exception
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(error_message, response.status_code, error_data)
+
         async def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> dict:
@@ -170,8 +204,7 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.get(url, headers=headers)
-
-            return response.raise_for_status().json()
+            return await self._process_response(response)
 
         async def post(
             self,
@@ -184,8 +217,7 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.post(url, headers=headers, json=payload)
-
-            return response.raise_for_status().json()
+            return await self._process_response(response)
 
         async def put(
             self,
@@ -198,8 +230,7 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.put(url, headers=headers, json=payload)
-
-            return response.raise_for_status().json()
+            return await self._process_response(response)
 
         async def patch(
             self,
@@ -212,8 +243,7 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.patch(url, headers=headers, json=payload)
-
-            return response.raise_for_status().json()
+            return await self._process_response(response)
 
         async def delete(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
@@ -222,7 +252,7 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.delete(url, headers=headers)
-            response.raise_for_status()
+            await self._process_response(response)
 
     DEFAULT_CLIENT = HttpxAsyncHttpClient
 except ImportError:

@@ -4,6 +4,10 @@ import json
 
 from . import client, domain
 
+from .errors import (
+    error_from_status,
+)
+
 
 class HttpClient(t.Protocol):
     @abc.abstractmethod
@@ -130,8 +134,21 @@ try:
             )
 
         def _process_response(self, response: requests.Response) -> dict:
-            response.raise_for_status()
-            return response.json()
+            try:
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.HTTPError as e:
+                # Extract error message from response if available
+                error_data = {}
+                try:
+                    error_data = response.json()
+                except ValueError:
+                    # Response is not JSON
+                    pass
+
+                # Use the error mapping to create appropriate exception
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(error_message, response.status_code, error_data)
 
     DEFAULT_CLIENT = RequestsHttpClient
 except ImportError:
@@ -159,13 +176,30 @@ try:
             self._client.close()
             self._client = None
 
+        def _process_response(self, response: httpx.Response) -> dict:
+            try:
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                # Extract error message from response if available
+                error_data = {}
+                try:
+                    error_data = response.json()
+                except ValueError:
+                    # Response is not JSON
+                    pass
+
+                # Use the error mapping to create appropriate exception
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(error_message, response.status_code, error_data)
+
         def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> dict:
             if self._client is None:
                 raise ValueError("Client not initialized")
 
-            return self._client.get(url, headers=headers).raise_for_status().json()
+            return self._process_response(self._client.get(url, headers=headers))
 
         def post(
             self,
@@ -177,10 +211,8 @@ try:
             if self._client is None:
                 raise ValueError("Client not initialized")
 
-            return (
+            return self._process_response(
                 self._client.post(url, headers=headers, json=payload)
-                .raise_for_status()
-                .json()
             )
 
         def delete(
@@ -189,7 +221,7 @@ try:
             if self._client is None:
                 raise ValueError("Client not initialized")
 
-            self._client.delete(url, headers=headers).raise_for_status()
+            self._process_response(self._client.delete(url, headers=headers))
 
         def put(
             self,
@@ -201,10 +233,8 @@ try:
             if self._client is None:
                 raise ValueError("Client not initialized")
 
-            return (
+            return self._process_response(
                 self._client.put(url, headers=headers, json=payload)
-                .raise_for_status()
-                .json()
             )
 
         def patch(
@@ -217,10 +247,8 @@ try:
             if self._client is None:
                 raise ValueError("Client not initialized")
 
-            return (
+            return self._process_response(
                 self._client.patch(url, headers=headers, json=payload)
-                .raise_for_status()
-                .json()
             )
 
     DEFAULT_CLIENT = HttpxHttpClient

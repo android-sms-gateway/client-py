@@ -1,12 +1,12 @@
 import os
 import pytest
-from requests import HTTPError
 
 from android_sms_gateway.client import APIClient
 from android_sms_gateway.constants import DEFAULT_URL
 from android_sms_gateway.domain import Webhook
 from android_sms_gateway.enums import WebhookEvent
 from android_sms_gateway.http import RequestsHttpClient
+from android_sms_gateway import errors
 
 
 @pytest.fixture
@@ -25,12 +25,15 @@ def client():
 
     :yields: An instance of `APIClient`.
     """
-    with RequestsHttpClient() as h, APIClient(
-        os.environ.get("API_LOGIN") or "test",
-        os.environ.get("API_PASSWORD") or "test",
-        base_url=os.environ.get("API_BASE_URL") or DEFAULT_URL,
-        http=h,
-    ) as c:
+    with (
+        RequestsHttpClient() as h,
+        APIClient(
+            os.environ.get("API_LOGIN") or "test",
+            os.environ.get("API_PASSWORD") or "test",
+            base_url=os.environ.get("API_BASE_URL") or DEFAULT_URL,
+            http=h,
+        ) as c,
+    ):
         yield c
 
 
@@ -75,7 +78,7 @@ class TestAPIClient:
 
         :param client: An instance of `APIClient`.
         """
-        with pytest.raises(HTTPError):
+        with pytest.raises(errors.APIError):
             client.create_webhook(
                 Webhook(None, url="not_a_url", event=WebhookEvent.SMS_RECEIVED)
             )
