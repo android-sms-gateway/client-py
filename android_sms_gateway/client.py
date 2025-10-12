@@ -42,7 +42,21 @@ class BaseClient(abc.ABC):
         message = dataclasses.replace(
             message,
             is_encrypted=True,
-            message=self.encryptor.encrypt(message.message),
+            text_message=(
+                domain.TextMessage(
+                    text=self.encryptor.encrypt(message.text_message.text)
+                )
+                if message.text_message
+                else None
+            ),
+            data_message=(
+                domain.DataMessage(
+                    data=self.encryptor.encrypt(message.data_message.data),
+                    port=message.data_message.port,
+                )
+                if message.data_message
+                else None
+            ),
             phone_numbers=[
                 self.encryptor.encrypt(phone) for phone in message.phone_numbers
             ],
@@ -177,6 +191,32 @@ class APIClient(BaseClient):
 
         self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
 
+    def list_devices(self) -> t.List[domain.Device]:
+        """Lists all devices."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return [
+            domain.Device.from_dict(device)
+            for device in self.http.get(
+                f"{self.base_url}/devices", headers=self.headers
+            )
+        ]
+
+    def remove_device(self, _id: str) -> None:
+        """Removes a device."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        self.http.delete(f"{self.base_url}/devices/{_id}", headers=self.headers)
+
+    def health_check(self) -> dict:
+        """Performs a health check."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.get(f"{self.base_url}/health", headers=self.headers)
+
 
 class AsyncAPIClient(BaseClient):
     def __init__(
@@ -286,3 +326,29 @@ class AsyncAPIClient(BaseClient):
             raise ValueError("HTTP client not initialized")
 
         await self.http.delete(f"{self.base_url}/webhooks/{_id}", headers=self.headers)
+
+    async def list_devices(self) -> t.List[domain.Device]:
+        """Lists all devices."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return [
+            domain.Device.from_dict(device)
+            for device in await self.http.get(
+                f"{self.base_url}/devices", headers=self.headers
+            )
+        ]
+
+    async def remove_device(self, _id: str) -> None:
+        """Removes a device."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        await self.http.delete(f"{self.base_url}/devices/{_id}", headers=self.headers)
+
+    async def health_check(self) -> dict:
+        """Performs a health check."""
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.get(f"{self.base_url}/health", headers=self.headers)

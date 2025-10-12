@@ -1,4 +1,7 @@
+import base64
 import dataclasses
+import datetime
+from io import BytesIO
 import typing as t
 
 from .enums import ProcessState, WebhookEvent, MessagePriority
@@ -9,31 +12,47 @@ def snake_to_camel(snake_str):
     return components[0] + "".join(x.title() for x in components[1:])
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class Message:
     """
     Represents an SMS message.
 
     Attributes:
-        message (str): The message text.
-        phone_numbers (List[str]): A list of phone numbers to send the message to.
-        with_delivery_report (bool): Whether to request a delivery report. Defaults to True.
-        is_encrypted (bool): Whether the message is encrypted. Defaults to False.
-        id (Optional[str]): The message ID. Defaults to None.
-        ttl (Optional[int]): The time-to-live in seconds. Defaults to None.
-        sim_number (Optional[int]): The SIM number to use. Defaults to None.
-        priority (Optional[MessagePriority]): The priority of the message. Defaults to None.
+        phone_numbers (List[str]): Recipients (phone numbers).
+        tex_message (Optional[TextMessage]): Text message.
+        data_message (Optional[DataMessage]): Data message.
+        priority (Optional[MessagePriority]): Priority.
+        sim_number (Optional[int]): SIM card number (1-3), if not set - default SIM will be used.
+        with_delivery_report (Optional[bool]): With delivery report.
+        is_encrypted (Optional[bool]): Is encrypted.
+        ttl (Optional[int]): Time to live in seconds (conflicts with `validUntil`).
+        valid_until (Optional[str]): Valid until (conflicts with `ttl`).
+        id (Optional[str]): ID (if not set - will be generated).
+        device_id (Optional[str]): Optional device ID for explicit selection.
     """
 
-    message: str
     phone_numbers: t.List[str]
+    text_message: t.Optional["TextMessage"] = None
+    data_message: t.Optional["DataMessage"] = None
+
+    priority: t.Optional[MessagePriority] = None
+    sim_number: t.Optional[int] = None
     with_delivery_report: bool = True
     is_encrypted: bool = False
 
-    id: t.Optional[str] = None
     ttl: t.Optional[int] = None
-    sim_number: t.Optional[int] = None
-    priority: t.Optional[MessagePriority] = None
+    valid_until: t.Optional[datetime.datetime] = None
+
+    id: t.Optional[str] = None
+    device_id: t.Optional[str] = None
+
+    @property
+    def content(self) -> str:
+        if self.text_message:
+            return self.text_message.text
+        if self.data_message:
+            return self.data_message.data
+        raise ValueError("Message has no content")
 
     def asdict(self) -> t.Dict[str, t.Any]:
         """
@@ -43,10 +62,87 @@ class Message:
             Dict[str, Any]: A dictionary representation of the message.
         """
         return {
-            snake_to_camel(field.name): getattr(self, field.name)
+            snake_to_camel(field.name): (
+                getattr(self, field.name).asdict()
+                if hasattr(getattr(self, field.name), "asdict")
+                else getattr(self, field.name)
+            )
             for field in dataclasses.fields(self)
             if getattr(self, field.name) is not None
         }
+
+
+@dataclasses.dataclass(frozen=True)
+class DataMessage:
+    """
+    Represents a data message.
+
+    Attributes:
+        data (str): Base64-encoded payload.
+        port (int): Destination port.
+    """
+
+    data: str
+    port: int
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        return {
+            "data": self.data,
+            "port": self.port,
+        }
+
+    @classmethod
+    def with_bytes(cls, data: bytes, port: int) -> "DataMessage":
+        return cls(
+            data=base64.b64encode(data).decode("utf-8"),
+            port=port,
+        )
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "DataMessage":
+        """Creates a DataMessage instance from a dictionary.
+
+        Args:
+            payload: A dictionary containing the data message's data.
+
+        Returns:
+            A DataMessage instance.
+        """
+        return cls(
+            data=payload["data"],
+            port=payload["port"],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class TextMessage:
+    """
+    Represents a text message.
+
+    Attributes:
+        text (str): Message text.
+    """
+
+    text: str
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        return {
+            "text": self.text,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "TextMessage":
+        """Creates a TextMessage instance from a dictionary.
+
+        Args:
+            payload: A dictionary containing the text message's data.
+
+        Returns:
+            A TextMessage instance.
+        """
+        return cls(
+            text=payload["text"],
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -124,3 +220,39 @@ class Webhook:
             "url": self.url,
             "event": self.event.value,
         }
+
+
+@dataclasses.dataclass(frozen=True)
+class Device:
+    """Represents a device."""
+
+    id: str
+    """The unique identifier of the device."""
+    name: str
+    """The name of the device."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Device":
+        """Creates a Device instance from a dictionary."""
+        return cls(
+            id=payload["id"],
+            name=payload["name"],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class ErrorResponse:
+    """Represents an error response from the API."""
+
+    code: int
+    """The error code."""
+    message: str
+    """The error message."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "ErrorResponse":
+        """Creates an ErrorResponse instance from a dictionary."""
+        return cls(
+            code=payload["code"],
+            message=payload["message"],
+        )
