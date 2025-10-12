@@ -1,8 +1,5 @@
 import abc
 import typing as t
-import json
-
-from . import client, domain
 
 from .errors import (
     error_from_status,
