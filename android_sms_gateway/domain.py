@@ -1,7 +1,6 @@
 import base64
 import dataclasses
 import datetime
-from io import BytesIO
 import typing as t
 
 from .enums import ProcessState, WebhookEvent, MessagePriority
