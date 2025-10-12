@@ -14,6 +14,16 @@ class AsyncHttpClient(t.Protocol):
     ) -> dict: ...
 
     @abc.abstractmethod
+    async def put(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    async def patch(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
     async def delete(
         self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
     ) -> None:
@@ -86,6 +96,38 @@ try:
                 response.raise_for_status()
                 return await response.json()
 
+        async def put(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            async with self._session.put(
+                url, headers=headers, json=payload
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+
+        async def patch(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            async with self._session.patch(
+                url, headers=headers, json=payload
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+
         async def delete(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
         ) -> None:
@@ -142,6 +184,34 @@ try:
                 raise ValueError("Client not initialized")
 
             response = await self._client.post(url, headers=headers, json=payload)
+
+            return response.raise_for_status().json()
+
+        async def put(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = await self._client.put(url, headers=headers, json=payload)
+
+            return response.raise_for_status().json()
+
+        async def patch(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = await self._client.patch(url, headers=headers, json=payload)
 
             return response.raise_for_status().json()
 

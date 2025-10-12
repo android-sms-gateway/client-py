@@ -1,5 +1,8 @@
 import abc
 import typing as t
+import json
+
+from . import client, domain
 
 
 class HttpClient(t.Protocol):
@@ -10,6 +13,16 @@ class HttpClient(t.Protocol):
 
     @abc.abstractmethod
     def post(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    def put(
+        self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> dict: ...
+
+    @abc.abstractmethod
+    def patch(
         self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
     ) -> dict: ...
 
@@ -34,6 +47,7 @@ class HttpClient(t.Protocol):
 
 
 DEFAULT_CLIENT: t.Optional[t.Type[HttpClient]] = None
+
 
 try:
     import requests
@@ -86,6 +100,34 @@ try:
                 raise ValueError("Session not initialized")
 
             self._session.delete(url, headers=headers).raise_for_status()
+
+        def put(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            return self._process_response(
+                self._session.put(url, headers=headers, json=payload)
+            )
+
+        def patch(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            return self._process_response(
+                self._session.patch(url, headers=headers, json=payload)
+            )
 
         def _process_response(self, response: requests.Response) -> dict:
             response.raise_for_status()
@@ -148,6 +190,38 @@ try:
                 raise ValueError("Client not initialized")
 
             self._client.delete(url, headers=headers).raise_for_status()
+
+        def put(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            return (
+                self._client.put(url, headers=headers, json=payload)
+                .raise_for_status()
+                .json()
+            )
+
+        def patch(
+            self,
+            url: str,
+            payload: dict,
+            *,
+            headers: t.Optional[t.Dict[str, str]] = None,
+        ) -> dict:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            return (
+                self._client.patch(url, headers=headers, json=payload)
+                .raise_for_status()
+                .json()
+            )
 
     DEFAULT_CLIENT = HttpxHttpClient
 except ImportError:
