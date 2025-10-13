@@ -71,10 +71,10 @@ class TestAPIClient:
     def test_webhook_create_invalid_url(self, client: APIClient):
         """
         Tests that attempting to create a webhook with an invalid URL raises an
-        `HTTPError`.
+        `errors.APIError`.
 
         The test creates a webhook with an invalid URL, and then asserts that an
-        `HTTPError` is raised.
+        `errors.APIError` is raised.
 
         :param client: An instance of `APIClient`.
         """

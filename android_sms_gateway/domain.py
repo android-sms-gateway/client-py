@@ -1,6 +1,7 @@
 import base64
 import dataclasses
 import datetime
+import enum
 import typing as t
 
 from .enums import ProcessState, WebhookEvent, MessagePriority
@@ -18,7 +19,7 @@ class Message:
 
     Attributes:
         phone_numbers (List[str]): Recipients (phone numbers).
-        tex_message (Optional[TextMessage]): Text message.
+        text_message (Optional[TextMessage]): Text message.
         data_message (Optional[DataMessage]): Data message.
         priority (Optional[MessagePriority]): Priority.
         sim_number (Optional[int]): SIM card number (1-3), if not set - default SIM will be used.
@@ -60,14 +61,20 @@ class Message:
         Returns:
             Dict[str, Any]: A dictionary representation of the message.
         """
+
+        def _serialize(value: t.Any) -> t.Any:
+            if hasattr(value, "asdict"):
+                return value.asdict()
+            if isinstance(value, datetime.datetime):
+                return value.isoformat()
+            if isinstance(value, enum.Enum):
+                return value.value
+            return value
+
         return {
-            snake_to_camel(field.name): (
-                getattr(self, field.name).asdict()
-                if hasattr(getattr(self, field.name), "asdict")
-                else getattr(self, field.name)
-            )
-            for field in dataclasses.fields(self)
-            if getattr(self, field.name) is not None
+            snake_to_camel(f.name): _serialize(getattr(self, f.name))
+            for f in dataclasses.fields(self)
+            if getattr(self, f.name) is not None
         }
 
 
