@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           pipenv sync --dev
-          pipenv sync --categories encryption
+          pipenv sync --categories requests,httpx,aiohttp,encryption
 
       - name: Lint with flake8
         run: pipenv run flake8 android_sms_gateway tests
