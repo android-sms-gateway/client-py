@@ -77,6 +77,9 @@ try:
         async def _process_response(self, response: aiohttp.ClientResponse) -> dict:
             try:
                 response.raise_for_status()
+                if response.status == 204:
+                    return {}
+
                 return await response.json()
             except aiohttp.ClientResponseError as e:
                 # Extract error message from response if available
@@ -89,7 +92,9 @@ try:
 
                 # Use the error mapping to create appropriate exception
                 error_message = str(e) or "HTTP request failed"
-                raise error_from_status(error_message, response.status, error_data)
+                raise error_from_status(
+                    error_message, response.status, error_data
+                ) from e
 
         async def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
@@ -183,6 +188,9 @@ try:
         async def _process_response(self, response: httpx.Response) -> dict:
             try:
                 response.raise_for_status()
+                if response.status_code == 204:
+                    return {}
+
                 return response.json()
             except httpx.HTTPStatusError as e:
                 # Extract error message from response if available
@@ -195,7 +203,9 @@ try:
 
                 # Use the error mapping to create appropriate exception
                 error_message = str(e) or "HTTP request failed"
-                raise error_from_status(error_message, response.status_code, error_data)
+                raise error_from_status(
+                    error_message, response.status_code, error_data
+                ) from e
 
         async def get(
             self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
