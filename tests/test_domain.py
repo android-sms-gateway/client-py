@@ -1,7 +1,13 @@
 import pytest
 
 from android_sms_gateway.enums import WebhookEvent, MessagePriority
-from android_sms_gateway.domain import MessageState, RecipientState, Webhook, Message
+from android_sms_gateway.domain import (
+    MessageState,
+    RecipientState,
+    Webhook,
+    Message,
+    TextMessage,
+)
 
 
 # Test for successful instantiation from a dictionary
@@ -150,7 +156,7 @@ def test_webhook_asdict():
             1,
             MessagePriority.BYPASS_THRESHOLD,
             {
-                "message": "Hello, world!",
+                "textMessage": {"text": "Hello, world!"},
                 "phoneNumbers": ["123", "456"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
@@ -170,7 +176,7 @@ def test_webhook_asdict():
             None,
             None,
             {
-                "message": "Hello, world!",
+                "textMessage": {"text": "Hello, world!"},
                 "phoneNumbers": ["123", "456"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
@@ -186,7 +192,7 @@ def test_webhook_asdict():
             1,
             None,
             {
-                "message": "Hello, world!",
+                "textMessage": {"text": "Hello, world!"},
                 "phoneNumbers": ["123", "456"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
@@ -204,7 +210,7 @@ def test_webhook_asdict():
             None,
             MessagePriority.DEFAULT,
             {
-                "message": "Hello, world!",
+                "textMessage": {"text": "Hello, world!"},
                 "phoneNumbers": ["123", "456"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
@@ -222,7 +228,7 @@ def test_webhook_asdict():
             None,
             MessagePriority.MINIMUM,
             {
-                "message": "Hi",
+                "textMessage": {"text": "Hi"},
                 "phoneNumbers": ["555"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
@@ -248,7 +254,7 @@ def test_message_asdict(
     Uses parametrized testing to cover multiple scenarios.
     """
     message = Message(
-        message=message_content,
+        text_message=TextMessage(text=message_content),
         phone_numbers=phone_numbers,
         with_delivery_report=with_delivery_report,
         is_encrypted=is_encrypted,
