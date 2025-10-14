@@ -80,12 +80,12 @@ try:
                 if response.status == 204:
                     return {}
 
-                return await response.json()
+                return response.json()
             except aiohttp.ClientResponseError as e:
                 # Extract error message from response if available
                 error_data = {}
                 try:
-                    error_data = await response.json()
+                    error_data = response.json()
                 except ValueError:
                     # Response is not JSON
                     pass

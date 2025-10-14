@@ -3,6 +3,9 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[pipenv]
+sort_pipfile = true
+
 [packages]
 
 [dev-packages]
@@ -14,6 +17,8 @@ wheel = "*"
 twine = "*"
 build = "*"
 importlib-metadata = "*"
+typing-extensions = "*"
+pytest-asyncio = "*"
 
 [requires]
 python_version = "3"
