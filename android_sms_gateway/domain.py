@@ -23,10 +23,10 @@ class Message:
         data_message (Optional[DataMessage]): Data message.
         priority (Optional[MessagePriority]): Priority.
         sim_number (Optional[int]): SIM card number (1-3), if not set - default SIM will be used.
-        with_delivery_report (Optional[bool]): With delivery report.
-        is_encrypted (Optional[bool]): Is encrypted.
+        with_delivery_report (bool): With delivery report.
+        is_encrypted (bool): Is encrypted.
         ttl (Optional[int]): Time to live in seconds (conflicts with `validUntil`).
-        valid_until (Optional[str]): Valid until (conflicts with `ttl`).
+        valid_until (Optional[datetime.datetime]): Valid until (conflicts with `ttl`).
         id (Optional[str]): ID (if not set - will be generated).
         device_id (Optional[str]): Optional device ID for explicit selection.
     """
@@ -45,6 +45,10 @@ class Message:
 
     id: t.Optional[str] = None
     device_id: t.Optional[str] = None
+
+    def __post_init__(self):
+        if self.ttl is not None and self.valid_until is not None:
+            raise ValueError("ttl and valid_until are mutually exclusive")
 
     @property
     def content(self) -> str:
