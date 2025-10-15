@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import aiohttp
 import httpx
@@ -175,12 +175,15 @@ class TestAiohttpAsyncHttpClientErrorHandling:
     @pytest.mark.asyncio
     async def test_raises_bad_request_error_for_400(self):
         """Test that BadRequestError is raised for 400 status."""
+        json = AsyncMock()
+        json.return_value = {"error": "bad request"}
+
         mock_response = Mock()
         mock_response.status = 400
         mock_response.raise_for_status.side_effect = aiohttp.ClientResponseError(
             request_info=Mock(), history=(), status=400, message="400 Client Error"
         )
-        mock_response.json.return_value = {"error": "bad request"}
+        mock_response.json = json
 
         client = AiohttpAsyncHttpClient()
 
@@ -193,12 +196,15 @@ class TestAiohttpAsyncHttpClientErrorHandling:
     @pytest.mark.asyncio
     async def test_raises_not_found_error_for_404(self):
         """Test that NotFoundError is raised for 404 status."""
+        json = AsyncMock()
+        json.return_value = {"error": "not found"}
+
         mock_response = Mock()
         mock_response.status = 404
         mock_response.raise_for_status.side_effect = aiohttp.ClientResponseError(
             request_info=Mock(), history=(), status=404, message="404 Not Found"
         )
-        mock_response.json.return_value = {"error": "not found"}
+        mock_response.json = json
 
         client = AiohttpAsyncHttpClient()
 

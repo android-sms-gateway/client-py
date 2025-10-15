@@ -1,4 +1,5 @@
 import pytest
+import datetime
 
 from android_sms_gateway.enums import WebhookEvent, MessagePriority
 from android_sms_gateway.domain import (
@@ -7,6 +8,7 @@ from android_sms_gateway.domain import (
     Webhook,
     Message,
     TextMessage,
+    DataMessage,
 )
 
 
@@ -265,3 +267,219 @@ def test_message_asdict(
     )
 
     assert message.asdict() == expected
+
+
+# Test for Message with data_message instead of text_message
+def test_message_with_data_message_only():
+    """Test creating a message with data_message only"""
+    data_msg = DataMessage(data="base64encodeddata", port=1234)
+    message = Message(
+        phone_numbers=["123", "456"],
+        data_message=data_msg,
+        with_delivery_report=True,
+        is_encrypted=False,
+    )
+
+    assert message.data_message == data_msg
+    assert message.text_message is None
+
+
+def test_message_serialization_with_data_message():
+    """Test serialization includes data_message"""
+    data_msg = DataMessage(data="base64encodeddata", port=1234)
+    message = Message(
+        phone_numbers=["123", "456"],
+        data_message=data_msg,
+        with_delivery_report=True,
+        is_encrypted=False,
+        id="msg_123",
+        device_id="device_001",
+    )
+
+    expected_dict = {
+        "dataMessage": {"data": "base64encodeddata", "port": 1234},
+        "phoneNumbers": ["123", "456"],
+        "withDeliveryReport": True,
+        "isEncrypted": False,
+        "id": "msg_123",
+        "deviceId": "device_001",
+    }
+
+    assert message.asdict() == expected_dict
+
+
+# Test for Message with both ttl and valid_until (should raise ValueError)
+def test_message_with_both_ttl_and_valid_until_raises_error():
+    """Test that providing both ttl and valid_until raises ValueError"""
+    text_msg = TextMessage(text="Hello, world!")
+
+    with pytest.raises(ValueError, match="ttl and valid_until are mutually exclusive"):
+        Message(
+            phone_numbers=["123", "456"],
+            text_message=text_msg,
+            ttl=300,
+            valid_until=datetime.datetime.now() + datetime.timedelta(seconds=600),
+        )
+
+
+def test_message_with_ttl_only():
+    """Test that providing only ttl works correctly"""
+    text_msg = TextMessage(text="Hello, world!")
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        ttl=300,
+    )
+
+    assert message.ttl == 300
+    assert message.valid_until is None
+    assert "ttl" in message.asdict()
+    assert "validUntil" not in message.asdict()
+
+
+def test_message_with_valid_until_only():
+    """Test that providing only valid_until works correctly"""
+    text_msg = TextMessage(text="Hello, world!")
+    valid_until_time = datetime.datetime.now() + datetime.timedelta(seconds=600)
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        valid_until=valid_until_time,
+    )
+
+    assert message.valid_until == valid_until_time
+    assert message.ttl is None
+    assert "validUntil" in message.asdict()
+    assert "ttl" not in message.asdict()
+
+
+# Test content property for both text and data messages, plus error case
+def test_message_content_property_with_text_message():
+    """Test content property returns text_message when text is set"""
+    text_msg = TextMessage(text="Hello, world!")
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+    )
+
+    assert message.content == "Hello, world!"
+
+
+def test_message_content_property_with_data_message():
+    """Test content property returns data_message when data is set"""
+    data_msg = DataMessage(data="base64encodeddata", port=1234)
+    message = Message(
+        phone_numbers=["123", "456"],
+        data_message=data_msg,
+    )
+
+    assert message.content == "base64encodeddata"
+
+
+def test_message_without_text_or_data_raises_error():
+    """Test that creating message without text or data raises appropriate error"""
+    message = Message(phone_numbers=["123", "456"])
+
+    with pytest.raises(ValueError, match="Message has no content"):
+        _ = message.content
+
+
+# Test serialization including device_id and valid_until
+def test_message_serialization_with_device_id():
+    """Test serialization includes device_id when present"""
+    text_msg = TextMessage(text="Hello, world!")
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        device_id="device_001",
+    )
+
+    assert "deviceId" in message.asdict()
+    assert message.asdict()["deviceId"] == "device_001"
+
+
+def test_message_serialization_with_valid_until():
+    """Test serialization includes valid_until when present"""
+    text_msg = TextMessage(text="Hello, world!")
+    valid_until_time = datetime.datetime.now() + datetime.timedelta(seconds=600)
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        valid_until=valid_until_time,
+    )
+
+    assert "validUntil" in message.asdict()
+    assert message.asdict()["validUntil"] == valid_until_time.isoformat()
+
+
+def test_message_serialization_with_ttl():
+    """Test serialization includes ttl when present"""
+    text_msg = TextMessage(text="Hello, world!")
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        ttl=300,
+    )
+
+    assert "ttl" in message.asdict()
+    assert message.asdict()["ttl"] == 300
+
+
+def test_message_serialization_format_for_text_message():
+    """Test serialization format for text message"""
+    text_msg = TextMessage(text="Hello, world!")
+    message = Message(
+        phone_numbers=["123", "456"],
+        text_message=text_msg,
+        with_delivery_report=True,
+        is_encrypted=False,
+        id="msg_123",
+        device_id="device_001",
+        ttl=300,
+        sim_number=1,
+        priority=MessagePriority.BYPASS_THRESHOLD,
+    )
+
+    expected_dict = {
+        "textMessage": {"text": "Hello, world!"},
+        "phoneNumbers": ["123", "456"],
+        "withDeliveryReport": True,
+        "isEncrypted": False,
+        "id": "msg_123",
+        "deviceId": "device_001",
+        "ttl": 300,
+        "simNumber": 1,
+        "priority": 100,
+    }
+
+    assert message.asdict() == expected_dict
+
+
+def test_message_serialization_format_for_data_message():
+    """Test serialization format for data message"""
+    data_msg = DataMessage(data="base64encodeddata", port=1234)
+    message = Message(
+        phone_numbers=["123", "456"],
+        data_message=data_msg,
+        with_delivery_report=True,
+        is_encrypted=False,
+        id="msg_123",
+        device_id="device_001",
+        ttl=300,
+        sim_number=1,
+        priority=MessagePriority.BYPASS_THRESHOLD,
+    )
+
+    expected_dict = {
+        "dataMessage": {"data": "base64encodeddata", "port": 1234},
+        "phoneNumbers": ["123", "456"],
+        "withDeliveryReport": True,
+        "isEncrypted": False,
+        "id": "msg_123",
+        "deviceId": "device_001",
+        "ttl": 300,
+        "simNumber": 1,
+        "priority": 100,
+    }
+
+    assert message.asdict() == expected_dict
