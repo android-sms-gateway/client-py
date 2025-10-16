@@ -133,7 +133,7 @@ try:
         def _process_response(self, response: requests.Response) -> dict:
             try:
                 response.raise_for_status()
-                if response.status_code == 204:
+                if response.status_code == 204 or not response.content:
                     return {}
 
                 return response.json()
@@ -141,7 +141,8 @@ try:
                 # Extract error message from response if available
                 error_data = {}
                 try:
-                    error_data = response.json()
+                    if response.content:
+                        error_data = response.json()
                 except ValueError:
                     # Response is not JSON
                     pass
@@ -181,7 +182,7 @@ try:
         def _process_response(self, response: httpx.Response) -> dict:
             try:
                 response.raise_for_status()
-                if response.status_code == 204:
+                if response.status_code == 204 or not response.content:
                     return {}
 
                 return response.json()
@@ -189,7 +190,8 @@ try:
                 # Extract error message from response if available
                 error_data = {}
                 try:
-                    error_data = response.json()
+                    if response.content:
+                        error_data = response.json()
                 except ValueError:
                     # Response is not JSON
                     pass
