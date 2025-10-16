@@ -1,4 +1,5 @@
 import abc
+from contextlib import suppress
 import typing as t
 
 from .errors import (
@@ -81,14 +82,13 @@ try:
                     return {}
 
                 return await response.json()
+            except aiohttp.ContentTypeError:
+                return {}
             except aiohttp.ClientResponseError as e:
                 # Extract error message from response if available
                 error_data = {}
-                try:
+                with suppress(ValueError, aiohttp.ContentTypeError):
                     error_data = await response.json()
-                except ValueError:
-                    # Response is not JSON
-                    pass
 
                 # Use the error mapping to create appropriate exception
                 error_message = str(e) or "HTTP request failed"
@@ -188,7 +188,7 @@ try:
         async def _process_response(self, response: httpx.Response) -> dict:
             try:
                 response.raise_for_status()
-                if response.status_code == 204:
+                if response.status_code == 204 or not response.content:
                     return {}
 
                 return response.json()
@@ -196,7 +196,8 @@ try:
                 # Extract error message from response if available
                 error_data = {}
                 try:
-                    error_data = response.json()
+                    if response.content:
+                        error_data = response.json()
                 except ValueError:
                     # Response is not JSON
                     pass
