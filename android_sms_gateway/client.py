@@ -16,15 +16,17 @@ class BaseClient(abc.ABC):
     def __init__(
         self,
         login: t.Optional[str],
-        password_or_token: str,
+        password: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
     ) -> None:
-        if login and password_or_token:
-            auth_header = f"Basic {base64.b64encode(f'{login}:{password_or_token}'.encode()).decode()}"
-        elif password_or_token:
-            auth_header = f"Bearer {password_or_token}"
+        if login and password:
+            auth_header = (
+                f"Basic {base64.b64encode(f'{login}:{password}'.encode()).decode()}"
+            )
+        elif password:
+            auth_header = f"Bearer {password}"
         else:
             raise ValueError("Either login and password or token must be provided")
 
@@ -92,7 +94,7 @@ class APIClient(BaseClient):
     def __init__(
         self,
         login: t.Optional[str],
-        password_or_token: str,
+        password: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
@@ -100,7 +102,7 @@ class APIClient(BaseClient):
     ) -> None:
         super().__init__(
             login=login,
-            password_or_token=password_or_token,
+            password=password,
             base_url=base_url,
             encryptor=encryptor,
         )
@@ -226,12 +228,47 @@ class APIClient(BaseClient):
 
         return self.http.get(f"{self.base_url}/health", headers=self.headers)
 
+    def generate_token(
+        self, token_request: domain.TokenRequest
+    ) -> domain.TokenResponse:
+        """
+        Generates a new JWT token with specified scopes and TTL.
+
+        Args:
+            token_request: The token request containing scopes and optional TTL.
+
+        Returns:
+            The generated token response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.TokenResponse.from_dict(
+            self.http.post(
+                f"{self.base_url}/auth/token",
+                payload=token_request.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    def revoke_token(self, jti: str) -> None:
+        """
+        Revokes a JWT token with the specified JTI (token ID).
+
+        Args:
+            jti: The JTI (token ID) of the token to revoke.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        self.http.delete(f"{self.base_url}/auth/token/{jti}", headers=self.headers)
+
 
 class AsyncAPIClient(BaseClient):
     def __init__(
         self,
         login: t.Optional[str],
-        password_or_token: str,
+        password: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
@@ -239,7 +276,7 @@ class AsyncAPIClient(BaseClient):
     ) -> None:
         super().__init__(
             login=login,
-            password_or_token=password_or_token,
+            password=password,
             base_url=base_url,
             encryptor=encryptor,
         )
@@ -258,7 +295,7 @@ class AsyncAPIClient(BaseClient):
         if self.default_http is None:
             return
 
-        self.default_http.__aexit__(exc_type, exc_val, exc_tb)
+        await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
         self.http = self.default_http = None
 
     async def send(self, message: domain.Message) -> domain.MessageState:
@@ -366,3 +403,40 @@ class AsyncAPIClient(BaseClient):
             raise ValueError("HTTP client not initialized")
 
         return await self.http.get(f"{self.base_url}/health", headers=self.headers)
+
+    async def generate_token(
+        self, token_request: domain.TokenRequest
+    ) -> domain.TokenResponse:
+        """
+        Generates a new JWT token with specified scopes and TTL.
+
+        Args:
+            token_request: The token request containing scopes and optional TTL.
+
+        Returns:
+            The generated token response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.TokenResponse.from_dict(
+            await self.http.post(
+                f"{self.base_url}/auth/token",
+                payload=token_request.asdict(),
+                headers=self.headers,
+            )
+        )
+
+    async def revoke_token(self, jti: str) -> None:
+        """
+        Revokes a JWT token with the specified JTI (token ID).
+
+        Args:
+            jti: The JTI (token ID) of the token to revoke.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        await self.http.delete(
+            f"{self.base_url}/auth/token/{jti}", headers=self.headers
+        )
