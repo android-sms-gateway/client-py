@@ -266,3 +266,57 @@ class ErrorResponse:
             code=payload["code"],
             message=payload["message"],
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class TokenRequest:
+    """Represents a request to generate a new JWT token."""
+
+    scopes: t.List[str]
+    """List of scopes for the token."""
+    ttl: t.Optional[int] = None
+    """Time to live for the token in seconds."""
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        """Returns a dictionary representation of the token request.
+
+        Returns:
+            A dictionary containing the token request data.
+        """
+        result: t.Dict[str, t.Any] = {
+            "scopes": self.scopes,
+        }
+        if self.ttl is not None:
+            result["ttl"] = self.ttl
+        return result
+
+
+@dataclasses.dataclass(frozen=True)
+class TokenResponse:
+    """Represents a response when generating a new JWT token."""
+
+    access_token: str
+    """The JWT access token."""
+    token_type: str
+    """The type of the token (e.g., 'Bearer')."""
+    id: str
+    """The unique identifier of the token (jti)."""
+    expires_at: str
+    """The expiration time of the token in ISO format."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "TokenResponse":
+        """Creates a TokenResponse instance from a dictionary.
+
+        Args:
+            payload: A dictionary containing the token response data.
+
+        Returns:
+            A TokenResponse instance.
+        """
+        return cls(
+            access_token=payload["accessToken"],
+            token_type=payload["tokenType"],
+            id=payload["id"],
+            expires_at=payload["expiresAt"],
+        )
