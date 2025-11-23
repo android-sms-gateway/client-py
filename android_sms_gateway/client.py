@@ -15,17 +15,21 @@ logger = logging.getLogger(__name__)
 class BaseClient(abc.ABC):
     def __init__(
         self,
-        login: str,
-        password: str,
+        login: t.Optional[str],
+        password_or_token: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
     ) -> None:
-        credentials = base64.b64encode(f"{login}:{password}".encode("utf-8")).decode(
-            "utf-8"
-        )
+        if login and password_or_token:
+            auth_header = f"Basic {base64.b64encode(f'{login}:{password_or_token}'.encode()).decode()}"
+        elif password_or_token:
+            auth_header = f"Bearer {password_or_token}"
+        else:
+            raise ValueError("Either login and password or token must be provided")
+
         self.headers = {
-            "Authorization": f"Basic {credentials}",
+            "Authorization": auth_header,
             "Content-Type": "application/json",
             "User-Agent": f"android-sms-gateway/{VERSION} (client; python {sys.version_info.major}.{sys.version_info.minor})",
         }
@@ -87,14 +91,19 @@ class BaseClient(abc.ABC):
 class APIClient(BaseClient):
     def __init__(
         self,
-        login: str,
-        password: str,
+        login: t.Optional[str],
+        password_or_token: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
         http: t.Optional[http.HttpClient] = None,
     ) -> None:
-        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
+        super().__init__(
+            login=login,
+            password_or_token=password_or_token,
+            base_url=base_url,
+            encryptor=encryptor,
+        )
         self.http = http
         self.default_http = None
 
@@ -221,14 +230,19 @@ class APIClient(BaseClient):
 class AsyncAPIClient(BaseClient):
     def __init__(
         self,
-        login: str,
-        password: str,
+        login: t.Optional[str],
+        password_or_token: str,
         *,
         base_url: str = DEFAULT_URL,
         encryptor: t.Optional[BaseEncryptor] = None,
         http_client: t.Optional[ahttp.AsyncHttpClient] = None,
     ) -> None:
-        super().__init__(login, password, base_url=base_url, encryptor=encryptor)
+        super().__init__(
+            login=login,
+            password_or_token=password_or_token,
+            base_url=base_url,
+            encryptor=encryptor,
+        )
         self.http = http_client
         self.default_http = None
 
@@ -244,7 +258,7 @@ class AsyncAPIClient(BaseClient):
         if self.default_http is None:
             return
 
-        await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
+        self.default_http.__aexit__(exc_type, exc_val, exc_tb)
         self.http = self.default_http = None
 
     async def send(self, message: domain.Message) -> domain.MessageState:
