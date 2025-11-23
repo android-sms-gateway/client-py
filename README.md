@@ -9,7 +9,7 @@
 [![GitHub Forks](https://img.shields.io/github/forks/android-sms-gateway/client-py.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/network)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/android-sms-gateway/client-py?style=for-the-badge)](https://www.coderabbit.ai)
 
-A modern Python client for seamless integration with the [SMS Gateway for Android](https://sms-gate.app) API. Send SMS messages programmatically through your Android devices with this powerful yet simple-to-use library.
+A modern Python client for seamless integration with the [SMSGate](https://sms-gate.app) API. Send SMS messages programmatically through your Android devices with this powerful yet simple-to-use library.
 
 ## 📖 About The Project
 
@@ -38,6 +38,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
   - [🚀 Quickstart](#-quickstart)
     - [Initial Setup](#initial-setup)
     - [Encryption Example](#encryption-example)
+    - [JWT Authentication Example](#jwt-authentication-example)
   - [🤖 Client Guide](#-client-guide)
     - [Client Configuration](#client-configuration)
     - [Available Methods](#available-methods)
@@ -45,11 +46,14 @@ This client abstracts away the complexities of the underlying HTTP API while pro
       - [Message](#message)
       - [MessageState](#messagestate)
       - [Webhook](#webhook)
+      - [TokenRequest](#tokenrequest)
+      - [TokenResponse](#tokenresponse)
   - [🌐 HTTP Clients](#-http-clients)
     - [Using Specific Clients](#using-specific-clients)
     - [Custom HTTP Client](#custom-http-client)
   - [🔒 Security](#-security)
     - [Best Practices](#best-practices)
+    - [JWT Security Best Practices](#jwt-security-best-practices)
     - [Secure Configuration Example](#secure-configuration-example)
   - [📚 API Reference](#-api-reference)
   - [👥 Contributing](#-contributing)
@@ -63,6 +67,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
 ## ✨ Features
 
 - 🔄 **Dual Client**: Supports both synchronous (`APIClient`) and asynchronous (`AsyncAPIClient`) interfaces
+- 🔐 **Flexible Authentication**: Supports both Basic Auth and JWT token authentication
 - 🔒 **End-to-End Encryption**: Optional message encryption using AES-256-CBC
 - 🌐 **Multiple HTTP Backends**: Native support for `requests`, `aiohttp`, and `httpx`
 - 🔗 **Webhook Management**: Programmatically create, query, and delete webhooks
@@ -70,6 +75,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
 - 💻 **Full Type Hinting**: Fully typed for better development experience
 - ⚠️ **Robust Error Handling**: Specific exceptions and clear error messages
 - 📈 **Delivery Reports**: Track your message delivery status
+- 🔑 **Token Management**: Generate and revoke JWT tokens with custom scopes and TTL
 
 ## ⚙️ Requirements
 
@@ -189,29 +195,102 @@ with client.APIClient(login, password, encryptor=encryptor) as c:
     print(f"Encrypted message sent: {state.id}")
 ```
 
+### JWT Authentication Example
+
+```python
+import os
+from android_sms_gateway import client, domain
+
+# Option 1: Using an existing JWT token
+jwt_token = os.getenv("ANDROID_SMS_GATEWAY_JWT_TOKEN")
+
+# Create client with JWT token
+with client.APIClient(login=None, password=jwt_token) as c:
+    message = domain.Message(
+        phone_numbers=["+1234567890"],
+        text_message=domain.TextMessage(
+            text="Hello from JWT authenticated client!",
+        ),
+    )
+
+# Option 2: Generate a new JWT token with Basic Auth
+login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
+password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
+
+with client.APIClient(login, password) as c:
+    # Generate a new JWT token with specific scopes and TTL
+    token_request = domain.TokenRequest(
+        scopes=["sms:send", "sms:read"],
+        ttl=3600  # Token expires in 1 hour
+    )
+    token_response = c.generate_token(token_request)
+    print(f"New JWT token: {token_response.access_token}")
+    print(f"Token expires at: {token_response.expires_at}")
+    
+    # Use the new token for subsequent requests
+    with client.APIClient(login=None, password=token_response.access_token) as jwt_client:
+        message = domain.Message(
+            phone_numbers=["+1234567890"],
+            text_message=domain.TextMessage(
+                text="Hello from newly generated JWT token!",
+            ),
+        )
+        state = jwt_client.send(message)
+        print(f"Message sent with new JWT token: {state.id}")
+        
+        # Revoke the token when no longer needed
+        jwt_client.revoke_token(token_response.id)
+        print(f"Token {token_response.id} has been revoked")
+```
+
 ## 🤖 Client Guide
 
 ### Client Configuration
 
 Both clients (`APIClient` and `AsyncAPIClient`) support these parameters:
 
-| Parameter   | Type                           | Description         | Default                                  |
-| ----------- | ------------------------------ | ------------------- | ---------------------------------------- |
-| `login`     | `str`                          | API username        | **Required**                             |
-| `password`  | `str`                          | API password        | **Required**                             |
-| `base_url`  | `str`                          | API base URL        | `"https://api.sms-gate.app/3rdparty/v1"` |
-| `encryptor` | `Encryptor`                    | Encryption instance | `None`                                   |
-| `http`      | `HttpClient`/`AsyncHttpClient` | Custom HTTP client  | Auto-detected                            |
+| Parameter   | Type                           | Description               | Default                                  |
+| ----------- | ------------------------------ | ------------------------- | ---------------------------------------- |
+| `login`     | `str`                          | API username              | **Required** (for Basic Auth)            |
+| `password`  | `str`                          | API password or JWT token | **Required**                             |
+| `base_url`  | `str`                          | API base URL              | `"https://api.sms-gate.app/3rdparty/v1"` |
+| `encryptor` | `Encryptor`                    | Encryption instance       | `None`                                   |
+| `http`      | `HttpClient`/`AsyncHttpClient` | Custom HTTP client        | Auto-detected                            |
+
+**Authentication Options:**
+
+1. **Basic Authentication** (traditional):
+   ```python
+   client.APIClient(login="username", password="password")
+   ```
+
+2. **JWT Token Authentication**:
+   ```python
+   # Using an existing JWT token
+   client.APIClient(login=None, password="your_jwt_token")
+   
+   # Or generate a token using Basic Auth first
+   with client.APIClient(login="username", password="password") as c:
+       token_request = domain.TokenRequest(scopes=["sms:send"], ttl=3600)
+       token_response = c.generate_token(token_request)
+       
+       # Use the new token
+       with client.APIClient(login=None, password=token_response.access_token) as jwt_client:
+           # Make API calls with JWT authentication
+           pass
+   ```
 
 ### Available Methods
 
-| Method                                    | Description          | Return Type            |
-| ----------------------------------------- | -------------------- | ---------------------- |
-| `send(message: domain.Message)`           | Send SMS message     | `domain.MessageState`  |
-| `get_state(id: str)`                      | Check message status | `domain.MessageState`  |
-| `create_webhook(webhook: domain.Webhook)` | Create new webhook   | `domain.Webhook`       |
-| `get_webhooks()`                          | List all webhooks    | `List[domain.Webhook]` |
-| `delete_webhook(id: str)`                 | Delete webhook       | `None`                 |
+| Method                                               | Description          | Return Type            |
+| ---------------------------------------------------- | -------------------- | ---------------------- |
+| `send(message: domain.Message)`                      | Send SMS message     | `domain.MessageState`  |
+| `get_state(id: str)`                                 | Check message status | `domain.MessageState`  |
+| `create_webhook(webhook: domain.Webhook)`            | Create new webhook   | `domain.Webhook`       |
+| `get_webhooks()`                                     | List all webhooks    | `List[domain.Webhook]` |
+| `delete_webhook(id: str)`                            | Delete webhook       | `None`                 |
+| `generate_token(token_request: domain.TokenRequest)` | Generate JWT token   | `domain.TokenResponse` |
+| `revoke_token(jti: str)`                             | Revoke JWT token     | `None`                 |
 
 ### Data Structures
 
@@ -250,6 +329,24 @@ class Webhook:
     event: WebhookEvent             # Event type
 ```
 
+#### TokenRequest
+
+```python
+class TokenRequest:
+    scopes: List[str]               # List of scopes for the token
+    ttl: Optional[int] = None       # Time to live for the token in seconds
+```
+
+#### TokenResponse
+
+```python
+class TokenResponse:
+    access_token: str               # The JWT access token
+    token_type: str                 # The type of the token (e.g., 'Bearer')
+    id: str                         # The unique identifier of the token (jti)
+    expires_at: str                 # The expiration time of the token in ISO format
+```
+
 For more details, see [`domain.py`](./android_sms_gateway/domain.py).
 
 ## 🌐 HTTP Clients
@@ -274,7 +371,7 @@ client.APIClient(..., http=http.HttpxHttpClient())
 client.APIClient(..., http=http.RequestsHttpClient())
 
 # Force aiohttp (async only)
-async with client.AsyncAPIClient(..., http=http.AiohttpHttpClient()) as c:
+async with client.AsyncAPIClient(..., http_client=http.AiohttpHttpClient()) as c:
     # ...
 ```
 
@@ -293,6 +390,16 @@ Implement your own HTTP client following the `http.HttpClient` (sync) or `ahttp.
 - 🔒 **HTTPS**: Use HTTPS for all production communications
 - 🔑 **Encryption**: Use end-to-end encryption for sensitive messages
 - 🔄 **Rotation**: Regularly rotate your credentials
+
+### JWT Security Best Practices
+
+When using JWT authentication, follow these additional security practices:
+
+- ⏱️ **Short TTL**: Use short time-to-live (TTL) for tokens (recommended: 1 hour or less)
+- 🔒 **Secure Storage**: Store JWT tokens securely, preferably in memory or secure storage
+- 🎯 **Minimal Scopes**: Request only the minimum necessary scopes for each token
+- 🔄 **Token Rotation**: Implement token refresh mechanisms before expiration
+- 🛑 **Revocation**: Immediately revoke compromised tokens using `revoke_token()`
 
 ### Secure Configuration Example
 
