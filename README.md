@@ -121,8 +121,8 @@ pip install android-sms-gateway[requests,encryption]
 
 1. **Configure your credentials**:
    ```bash
-   export ANDROID_SMS_GATEWAY_LOGIN="your_username"
-   export ANDROID_SMS_GATEWAY_PASSWORD="your_password"
+   export SMSGATE_USERNAME="your_username"
+   export SMSGATE_PASSWORD="your_password"
    ```
 
 2. **Basic usage example**:
@@ -134,14 +134,16 @@ import os
 from android_sms_gateway import client, domain
 
 # Configuration
-login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
-password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
+login = os.getenv("SMSGATE_USERNAME")
+password = os.getenv("SMSGATE_PASSWORD")
 
 # Create message
 message = domain.Message(
-    "Hello! This is a test message.",
-    ["+1234567890"],
-    with_delivery_report=True
+    phone_numbers=["+1234567890"],
+    text_message=domain.TextMessage(
+        text="Hello! This is a test message.",
+    ),
+    with_delivery_report=True,
 )
 
 # Synchronous Client
@@ -184,9 +186,10 @@ encryptor = Encryptor("my-super-secure-secret-passphrase")
 
 # Encrypted message
 message = domain.Message(
-    "This message will be encrypted!",
-    ["+1234567890"],
-    is_encrypted=True
+    phone_numbers=["+1234567890"],
+    text_message=domain.TextMessage(
+        text="This message will be encrypted!"
+    ),
 )
 
 # Client with encryption
@@ -214,8 +217,8 @@ with client.APIClient(login=None, password=jwt_token) as c:
     )
 
 # Option 2: Generate a new JWT token with Basic Auth
-login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
-password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
+login = os.getenv("SMSGATE_USERNAME")
+password = os.getenv("SMSGATE_PASSWORD")
 
 with client.APIClient(login, password) as c:
     # Generate a new JWT token with specific scopes and TTL
@@ -411,8 +414,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Secure configuration
-login = os.getenv("ANDROID_SMS_GATEWAY_LOGIN")
-password = os.getenv("ANDROID_SMS_GATEWAY_PASSWORD")
+login = os.getenv("SMSGATE_USERNAME")
+password = os.getenv("SMSGATE_PASSWORD")
 
 if not login or not password:
     raise ValueError("Credentials not configured!")
