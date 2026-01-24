@@ -217,7 +217,7 @@ class Webhook:
         """
         return cls(
             id=payload.get("id"),
-            device_id=payload.get("device_id"),
+            device_id=payload.get("deviceId"),
             url=payload["url"],
             event=WebhookEvent(payload["event"]),
         )
@@ -230,7 +230,7 @@ class Webhook:
         """
         return {
             "id": self.id,
-            "device_id": self.device_id,
+            "deviceId": self.device_id,
             "url": self.url,
             "event": self.event.value,
         }
