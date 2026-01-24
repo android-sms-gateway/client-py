@@ -198,6 +198,8 @@ class Webhook:
 
     id: t.Optional[str]
     """The unique identifier of the webhook."""
+    device_id: t.Optional[str]
+    """The unique identifier of the device the webhook is associated with."""
     url: str
     """The URL the webhook will be sent to."""
     event: WebhookEvent
@@ -215,6 +217,7 @@ class Webhook:
         """
         return cls(
             id=payload.get("id"),
+            device_id=payload.get("device_id"),
             url=payload["url"],
             event=WebhookEvent(payload["event"]),
         )
@@ -227,6 +230,7 @@ class Webhook:
         """
         return {
             "id": self.id,
+            "device_id": self.device_id,
             "url": self.url,
             "event": self.event.value,
         }
