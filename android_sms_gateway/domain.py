@@ -202,6 +202,8 @@ class Webhook:
     """The URL the webhook will be sent to."""
     event: WebhookEvent
     """The type of event the webhook is triggered for."""
+    device_id: t.Optional[str] = None
+    """The unique identifier of the device the webhook is associated with."""
 
     @classmethod
     def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Webhook":
@@ -215,6 +217,7 @@ class Webhook:
         """
         return cls(
             id=payload.get("id"),
+            device_id=payload.get("deviceId", None),
             url=payload["url"],
             event=WebhookEvent(payload["event"]),
         )
@@ -227,6 +230,7 @@ class Webhook:
         """
         return {
             "id": self.id,
+            "deviceId": self.device_id,
             "url": self.url,
             "event": self.event.value,
         }
