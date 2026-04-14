@@ -4,6 +4,7 @@ import dataclasses
 import logging
 import sys
 import typing as t
+from urllib.parse import urlencode
 
 from . import ahttp, domain, http
 from .constants import DEFAULT_URL, VERSION
@@ -124,15 +125,41 @@ class APIClient(BaseClient):
         self.default_http.__exit__(exc_type, exc_val, exc_tb)
         self.http = self.default_http = None
 
-    def send(self, message: domain.Message) -> domain.MessageState:
+    def send(
+        self,
+        message: domain.Message,
+        *,
+        skip_phone_validation: bool = False,
+        device_active_within: int = 0,
+    ) -> domain.MessageState:
+        """
+        Sends an SMS message.
+
+        Args:
+            message: The message to send.
+            skip_phone_validation: Skip phone number validation.
+            device_active_within: Filter devices active within the specified number of hours.
+
+        Returns:
+            The message response.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
         message = self._encrypt(message)
+
+        params = {}
+        if skip_phone_validation:
+            params["skipPhoneValidation"] = "true"
+        if device_active_within > 0:
+            params["deviceActiveWithin"] = device_active_within
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
         return self._decrypt(
             domain.MessageState.from_dict(
                 self.http.post(
-                    f"{self.base_url}/message",
+                    url,
                     payload=message.asdict(),
                     headers=self.headers,
                 )
@@ -140,13 +167,73 @@ class APIClient(BaseClient):
         )
 
     def get_state(self, _id: str) -> domain.MessageState:
+        """
+        Returns message state by ID.
+
+        Args:
+            _id: The message ID.
+
+        Returns:
+            The message response.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
         return self._decrypt(
             domain.MessageState.from_dict(
-                self.http.get(f"{self.base_url}/message/{_id}", headers=self.headers)
+                self.http.get(f"{self.base_url}/messages/{_id}", headers=self.headers)
             )
+        )
+
+    def get_messages(
+        self,
+        *,
+        query: t.Optional[domain.MessagesQueryFilter] = None,
+        pagination: t.Optional[domain.QueryPagination] = None,
+    ) -> t.List[domain.MessageState]:
+        """
+        Retrieves a list of messages with filtering and pagination.
+
+        Args:
+            query: Optional query filter (date range, state, device ID).
+            pagination: Optional pagination (limit, offset).
+
+        Returns:
+            A list of message states.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params = {}
+        if query is not None:
+            params.update(query.asdict())
+        if pagination is not None:
+            params.update(pagination.asdict())
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
+        return [
+            self._decrypt(domain.MessageState.from_dict(msg))
+            for msg in self.http.get(url, headers=self.headers)
+        ]
+
+    def export_inbox(self, request: domain.MessagesExportRequest) -> t.Dict[str, t.Any]:
+        """
+        Initiates process of inbox messages export via webhooks.
+
+        Args:
+            request: The export request containing device ID and time range.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.post(
+            f"{self.base_url}/messages/inbox/export",
+            payload=request.asdict(),
+            headers=self.headers,
         )
 
     def get_webhooks(self) -> t.List[domain.Webhook]:
@@ -221,12 +308,145 @@ class APIClient(BaseClient):
 
         self.http.delete(f"{self.base_url}/devices/{_id}", headers=self.headers)
 
-    def health_check(self) -> dict:
-        """Performs a health check."""
+    def get_settings(self) -> domain.DeviceSettings:
+        """
+        Returns settings for the user.
+
+        Returns:
+            The device settings.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
-        return self.http.get(f"{self.base_url}/health", headers=self.headers)
+        return domain.DeviceSettings.from_dict(
+            self.http.get(f"{self.base_url}/settings", headers=self.headers)
+        )
+
+    def update_settings(self, settings: domain.DeviceSettings) -> t.Dict[str, t.Any]:
+        """
+        Replaces settings.
+
+        Args:
+            settings: The settings to update.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.put(
+            f"{self.base_url}/settings",
+            payload=settings.asdict(),
+            headers=self.headers,
+        )
+
+    def patch_settings(self, settings: domain.DeviceSettings) -> t.Dict[str, t.Any]:
+        """
+        Partially updates settings.
+
+        Args:
+            settings: The settings to update.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.patch(
+            f"{self.base_url}/settings",
+            payload=settings.asdict(),
+            headers=self.headers,
+        )
+
+    def get_logs(
+        self,
+        *,
+        from_: t.Optional[str] = None,
+        to: t.Optional[str] = None,
+    ) -> t.List[domain.LogEntry]:
+        """
+        Retrieves a list of log entries within a specified time range.
+
+        Args:
+            from_: The start of the time range (RFC3339 format).
+            to: The end of the time range (RFC3339 format).
+
+        Returns:
+            A list of log entries.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params = {}
+        if from_ is not None:
+            params["from"] = from_
+        if to is not None:
+            params["to"] = to
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/logs" + (f"?{qs}" if qs else "")
+        return [
+            domain.LogEntry.from_dict(log)
+            for log in self.http.get(url, headers=self.headers)
+        ]
+
+    def health_check(self) -> domain.HealthResponse:
+        """
+        Performs a health check (readiness probe).
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            self.http.get(f"{self.base_url}/health", headers=self.headers)
+        )
+
+    def liveness_check(self) -> domain.HealthResponse:
+        """
+        Performs a liveness check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            self.http.get(f"{self.base_url}/health/live", headers=self.headers)
+        )
+
+    def readiness_check(self) -> domain.HealthResponse:
+        """
+        Performs a readiness check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            self.http.get(f"{self.base_url}/health/ready", headers=self.headers)
+        )
+
+    def startup_check(self) -> domain.HealthResponse:
+        """
+        Performs a startup check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            self.http.get(f"{self.base_url}/health/startup", headers=self.headers)
+        )
 
     def generate_token(
         self, token_request: domain.TokenRequest
@@ -248,6 +468,30 @@ class APIClient(BaseClient):
                 f"{self.base_url}/auth/token",
                 payload=token_request.asdict(),
                 headers=self.headers,
+            )
+        )
+
+    def refresh_token(self, refresh_token: str) -> domain.TokenResponse:
+        """
+        Refreshes an access token with the specified refresh token.
+
+        Args:
+            refresh_token: The refresh token.
+
+        Returns:
+            The new token response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        headers = self.headers.copy()
+        headers["Authorization"] = f"Bearer {refresh_token}"
+
+        return domain.TokenResponse.from_dict(
+            self.http.post(
+                f"{self.base_url}/auth/token/refresh",
+                payload={},
+                headers=headers,
             )
         )
 
@@ -298,15 +542,41 @@ class AsyncAPIClient(BaseClient):
         await self.default_http.__aexit__(exc_type, exc_val, exc_tb)
         self.http = self.default_http = None
 
-    async def send(self, message: domain.Message) -> domain.MessageState:
+    async def send(
+        self,
+        message: domain.Message,
+        *,
+        skip_phone_validation: bool = False,
+        device_active_within: int = 0,
+    ) -> domain.MessageState:
+        """
+        Sends an SMS message.
+
+        Args:
+            message: The message to send.
+            skip_phone_validation: Skip phone number validation.
+            device_active_within: Filter devices active within the specified number of hours.
+
+        Returns:
+            The message response.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
         message = self._encrypt(message)
+
+        params = {}
+        if skip_phone_validation:
+            params["skipPhoneValidation"] = "true"
+        if device_active_within > 0:
+            params["deviceActiveWithin"] = device_active_within
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
         return self._decrypt(
             domain.MessageState.from_dict(
                 await self.http.post(
-                    f"{self.base_url}/message",
+                    url,
                     payload=message.asdict(),
                     headers=self.headers,
                 )
@@ -314,15 +584,76 @@ class AsyncAPIClient(BaseClient):
         )
 
     async def get_state(self, _id: str) -> domain.MessageState:
+        """
+        Returns message state by ID.
+
+        Args:
+            _id: The message ID.
+
+        Returns:
+            The message response.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
         return self._decrypt(
             domain.MessageState.from_dict(
                 await self.http.get(
-                    f"{self.base_url}/message/{_id}", headers=self.headers
+                    f"{self.base_url}/messages/{_id}", headers=self.headers
                 )
             )
+        )
+
+    async def get_messages(
+        self,
+        *,
+        query: t.Optional[domain.MessagesQueryFilter] = None,
+        pagination: t.Optional[domain.QueryPagination] = None,
+    ) -> t.List[domain.MessageState]:
+        """
+        Retrieves a list of messages with filtering and pagination.
+
+        Args:
+            request: The query request containing filters and pagination parameters.
+
+        Returns:
+            A list of message states.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params = {}
+        if query is not None:
+            params.update(query.asdict())
+        if pagination is not None:
+            params.update(pagination.asdict())
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
+        return [
+            self._decrypt(domain.MessageState.from_dict(msg))
+            for msg in await self.http.get(url, headers=self.headers)
+        ]
+
+    async def export_inbox(
+        self, request: domain.MessagesExportRequest
+    ) -> t.Dict[str, t.Any]:
+        """
+        Initiates process of inbox messages export via webhooks.
+
+        Args:
+            request: The export request containing device ID and time range.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.post(
+            f"{self.base_url}/messages/inbox/export",
+            payload=request.asdict(),
+            headers=self.headers,
         )
 
     async def get_webhooks(self) -> t.List[domain.Webhook]:
@@ -397,12 +728,149 @@ class AsyncAPIClient(BaseClient):
 
         await self.http.delete(f"{self.base_url}/devices/{_id}", headers=self.headers)
 
-    async def health_check(self) -> dict:
-        """Performs a health check."""
+    async def get_settings(self) -> domain.DeviceSettings:
+        """
+        Returns settings for the user.
+
+        Returns:
+            The device settings.
+        """
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
-        return await self.http.get(f"{self.base_url}/health", headers=self.headers)
+        return domain.DeviceSettings.from_dict(
+            await self.http.get(f"{self.base_url}/settings", headers=self.headers)
+        )
+
+    async def update_settings(
+        self, settings: domain.DeviceSettings
+    ) -> t.Dict[str, t.Any]:
+        """
+        Replaces settings.
+
+        Args:
+            settings: The settings to update.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.put(
+            f"{self.base_url}/settings",
+            payload=settings.asdict(),
+            headers=self.headers,
+        )
+
+    async def patch_settings(
+        self, settings: domain.DeviceSettings
+    ) -> t.Dict[str, t.Any]:
+        """
+        Partially updates settings.
+
+        Args:
+            settings: The settings to update.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.patch(
+            f"{self.base_url}/settings",
+            payload=settings.asdict(),
+            headers=self.headers,
+        )
+
+    async def get_logs(
+        self,
+        *,
+        from_: t.Optional[str] = None,
+        to: t.Optional[str] = None,
+    ) -> t.List[domain.LogEntry]:
+        """
+        Retrieves a list of log entries within a specified time range.
+
+        Args:
+            from_: The start of the time range (RFC3339 format).
+            to: The end of the time range (RFC3339 format).
+
+        Returns:
+            A list of log entries.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params = {}
+        if from_ is not None:
+            params["from"] = from_
+        if to is not None:
+            params["to"] = to
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/logs" + (f"?{qs}" if qs else "")
+        return [
+            domain.LogEntry.from_dict(log)
+            for log in await self.http.get(url, headers=self.headers)
+        ]
+
+    async def health_check(self) -> domain.HealthResponse:
+        """
+        Performs a health check (readiness probe).
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            await self.http.get(f"{self.base_url}/health", headers=self.headers)
+        )
+
+    async def liveness_check(self) -> domain.HealthResponse:
+        """
+        Performs a liveness check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            await self.http.get(f"{self.base_url}/health/live", headers=self.headers)
+        )
+
+    async def readiness_check(self) -> domain.HealthResponse:
+        """
+        Performs a readiness check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            await self.http.get(f"{self.base_url}/health/ready", headers=self.headers)
+        )
+
+    async def startup_check(self) -> domain.HealthResponse:
+        """
+        Performs a startup check.
+
+        Returns:
+            The health response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return domain.HealthResponse.from_dict(
+            await self.http.get(f"{self.base_url}/health/startup", headers=self.headers)
+        )
 
     async def generate_token(
         self, token_request: domain.TokenRequest
@@ -424,6 +892,29 @@ class AsyncAPIClient(BaseClient):
                 f"{self.base_url}/auth/token",
                 payload=token_request.asdict(),
                 headers=self.headers,
+            )
+        )
+
+    async def refresh_token(self, refresh_token: str) -> domain.TokenResponse:
+        """
+        Refreshes an access token with the specified refresh token.
+
+        Args:
+            refresh_token: The refresh token.
+
+        Returns:
+            The new token response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        headers = self.headers.copy()
+        headers["Authorization"] = f"Bearer {refresh_token}"
+
+        return domain.TokenResponse.from_dict(
+            await self.http.post(
+                f"{self.base_url}/auth/token/refresh",
+                headers=headers,
             )
         )
 
