@@ -1,4 +1,4 @@
-# 📱 SMS Gateway for Android™ Python API Client
+# 📱 SMSGate Python API Client
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=for-the-badge)](https://github.com/android-sms-gateway/client-py/blob/master/LICENSE)
 [![PyPI Version](https://img.shields.io/pypi/v/android-sms-gateway.svg?style=for-the-badge)](https://pypi.org/project/android-sms-gateway/)
@@ -26,7 +26,7 @@ Key value propositions:
 This client abstracts away the complexities of the underlying HTTP API while providing all the necessary functionality to send and track SMS messages through Android devices.
 
 ## 📚 Table of Contents
-- [📱 SMS Gateway for Android™ Python API Client](#-sms-gateway-for-android-python-api-client)
+- [📱 SMSGate Python API Client](#-smsgate-python-api-client)
   - [📖 About The Project](#-about-the-project)
   - [📚 Table of Contents](#-table-of-contents)
   - [✨ Features](#-features)
@@ -42,12 +42,24 @@ This client abstracts away the complexities of the underlying HTTP API while pro
   - [🤖 Client Guide](#-client-guide)
     - [Client Configuration](#client-configuration)
     - [Available Methods](#available-methods)
+      - [Message Methods](#message-methods)
+      - [Webhook Methods](#webhook-methods)
+      - [Device Methods](#device-methods)
+      - [Settings Methods](#settings-methods)
+      - [Log Methods](#log-methods)
+      - [Health Check Methods](#health-check-methods)
+      - [Token Methods](#token-methods)
     - [Data Structures](#data-structures)
       - [Message](#message)
       - [MessageState](#messagestate)
       - [Webhook](#webhook)
+      - [Device](#device)
+      - [DeviceSettings](#devicesettings)
       - [TokenRequest](#tokenrequest)
       - [TokenResponse](#tokenresponse)
+      - [HealthResponse](#healthresponse)
+      - [LogEntry](#logentry)
+      - [Enums](#enums)
   - [🌐 HTTP Clients](#-http-clients)
     - [Using Specific Clients](#using-specific-clients)
     - [Custom HTTP Client](#custom-http-client)
@@ -75,7 +87,13 @@ This client abstracts away the complexities of the underlying HTTP API while pro
 - 💻 **Full Type Hinting**: Fully typed for better development experience
 - ⚠️ **Robust Error Handling**: Specific exceptions and clear error messages
 - 📈 **Delivery Reports**: Track your message delivery status
-- 🔑 **Token Management**: Generate and revoke JWT tokens with custom scopes and TTL
+- 🔑 **Token Management**: Generate, refresh, and revoke JWT tokens with custom scopes and TTL
+- 📊 **Message Filtering**: List messages with date range, state, and device filtering
+- ⚙️ **Settings Management**: Get, update, and patch device settings
+- 📝 **Logging**: Retrieve system logs with time range filtering
+- 🏥 **Health Checks**: Liveness, readiness, and startup probes
+- 📱 **Device Management**: List and remove registered devices
+- 📥 **Inbox Export**: Export received messages via webhooks
 
 ## ⚙️ Requirements
 
@@ -150,22 +168,22 @@ message = domain.Message(
 def sync_example():
     with client.APIClient(login, password) as c:
         # Send message
-        state = c.send(message)
-        print(f"Message sent with ID: {state.id}")
+        response = c.send(message)
+        print(f"Message sent with ID: {response.id}")
         
         # Check status
-        status = c.get_state(state.id)
+        status = c.get_state(response.id)
         print(f"Status: {status.state}")
 
 # Asynchronous Client
 async def async_example():
     async with client.AsyncAPIClient(login, password) as c:
         # Send message
-        state = await c.send(message)
-        print(f"Message sent with ID: {state.id}")
+        response = await c.send(message)
+        print(f"Message sent with ID: {response.id}")
         
         # Check status
-        status = await c.get_state(state.id)
+        status = await c.get_state(response.id)
         print(f"Status: {status.state}")
 
 if __name__ == "__main__":
@@ -194,8 +212,8 @@ message = domain.Message(
 
 # Client with encryption
 with client.APIClient(login, password, encryptor=encryptor) as c:
-    state = c.send(message)
-    print(f"Encrypted message sent: {state.id}")
+    response = c.send(message)
+    print(f"Encrypted message sent: {response.id}")
 ```
 
 ### JWT Authentication Example
@@ -238,8 +256,8 @@ with client.APIClient(login, password) as c:
                 text="Hello from newly generated JWT token!",
             ),
         )
-        state = jwt_client.send(message)
-        print(f"Message sent with new JWT token: {state.id}")
+        response = jwt_client.send(message)
+        print(f"Message sent with new JWT token: {response.id}")
         
         # Revoke the token when no longer needed
         jwt_client.revoke_token(token_response.id)
@@ -285,15 +303,60 @@ Both clients (`APIClient` and `AsyncAPIClient`) support these parameters:
 
 ### Available Methods
 
-| Method                                               | Description          | Return Type            |
-| ---------------------------------------------------- | -------------------- | ---------------------- |
-| `send(message: domain.Message)`                      | Send SMS message     | `domain.MessageState`  |
-| `get_state(id: str)`                                 | Check message status | `domain.MessageState`  |
-| `create_webhook(webhook: domain.Webhook)`            | Create new webhook   | `domain.Webhook`       |
-| `get_webhooks()`                                     | List all webhooks    | `List[domain.Webhook]` |
-| `delete_webhook(id: str)`                            | Delete webhook       | `None`                 |
-| `generate_token(token_request: domain.TokenRequest)` | Generate JWT token   | `domain.TokenResponse` |
-| `revoke_token(jti: str)`                             | Revoke JWT token     | `None`                 |
+#### Message Methods
+
+| Method                                                                  | Description                        | Return Type                 |
+| ----------------------------------------------------------------------- | ---------------------------------- | --------------------------- |
+| `send(message, *, skip_phone_validation=False, device_active_within=0)` | Send SMS message                   | `domain.MessageState`       |
+| `get_state(id)`                                                         | Get message state by ID            | `domain.MessageState`       |
+| `get_messages(*, filter=None, pagination=None)`                         | List messages with filtering       | `List[domain.MessageState]` |
+| `export_inbox(request)`                                                 | Export inbox messages via webhooks | `dict`                      |
+
+#### Webhook Methods
+
+| Method                    | Description        | Return Type            |
+| ------------------------- | ------------------ | ---------------------- |
+| `create_webhook(webhook)` | Create new webhook | `domain.Webhook`       |
+| `get_webhooks()`          | List all webhooks  | `List[domain.Webhook]` |
+| `delete_webhook(id)`      | Delete webhook     | `None`                 |
+
+#### Device Methods
+
+| Method              | Description                 | Return Type           |
+| ------------------- | --------------------------- | --------------------- |
+| `list_devices()`    | List all registered devices | `List[domain.Device]` |
+| `remove_device(id)` | Remove a device             | `None`                |
+
+#### Settings Methods
+
+| Method                      | Description               | Return Type             |
+| --------------------------- | ------------------------- | ----------------------- |
+| `get_settings()`            | Get device settings       | `domain.DeviceSettings` |
+| `update_settings(settings)` | Replace settings          | `dict`                  |
+| `patch_settings(settings)`  | Partially update settings | `dict`                  |
+
+#### Log Methods
+
+| Method                          | Description     | Return Type             |
+| ------------------------------- | --------------- | ----------------------- |
+| `get_logs(from_=None, to=None)` | Get log entries | `List[domain.LogEntry]` |
+
+#### Health Check Methods
+
+| Method              | Description     | Return Type             |
+| ------------------- | --------------- | ----------------------- |
+| `health_check()`    | Readiness probe | `domain.HealthResponse` |
+| `liveness_check()`  | Liveness probe  | `domain.HealthResponse` |
+| `readiness_check()` | Readiness probe | `domain.HealthResponse` |
+| `startup_check()`   | Startup probe   | `domain.HealthResponse` |
+
+#### Token Methods
+
+| Method                          | Description          | Return Type            |
+| ------------------------------- | -------------------- | ---------------------- |
+| `generate_token(token_request)` | Generate JWT token   | `domain.TokenResponse` |
+| `refresh_token(refresh_token)`  | Refresh access token | `domain.TokenResponse` |
+| `revoke_token(jti)`             | Revoke JWT token     | `None`                 |
 
 ### Data Structures
 
@@ -301,26 +364,30 @@ Both clients (`APIClient` and `AsyncAPIClient`) support these parameters:
 
 ```python
 class Message:
-    message: str                       # Message text
-    phone_numbers: List[str]           # List of phone numbers
+    phone_numbers: List[str]           # List of phone numbers (required)
+    text_message: Optional[TextMessage] = None  # Text message
+    data_message: Optional[DataMessage] = None  # Data message
+    priority: Optional[MessagePriority] = None  # Message priority
+    sim_number: Optional[int] = None   # SIM card number (1-3)
     with_delivery_report: bool = True  # Delivery report
     is_encrypted: bool = False         # Whether message is encrypted
-    
-    # Optional fields
-    id: Optional[str] = None         # Message ID
-    ttl: Optional[int] = None        # Time-to-live in seconds
-    sim_number: Optional[int] = None # SIM number
+    ttl: Optional[int] = None          # Time-to-live in seconds
+    valid_until: Optional[datetime] = None  # Valid until timestamp
+    id: Optional[str] = None           # Message ID
+    device_id: Optional[str] = None    # Device ID for explicit selection
 ```
 
 #### MessageState
 
 ```python
 class MessageState:
-    id: str                          # Unique message ID
-    state: ProcessState              # Current state (SENT, DELIVERED, etc.)
-    recipients: List[RecipientState] # Per-recipient status
-    is_hashed: bool                  # Whether message was hashed
-    is_encrypted: bool               # Whether message was encrypted
+    id: str                            # Unique message ID
+    state: ProcessState                # Current processing state
+    recipients: List[RecipientState]   # Per-recipient status
+    is_hashed: bool = False            # Whether phone numbers are hashed
+    is_encrypted: bool = False         # Whether message was encrypted
+    device_id: Optional[str] = None    # Device ID (optional for backward compatibility)
+    states: Optional[Dict[str, str]] = None  # History of state changes
 ```
 
 #### Webhook
@@ -330,14 +397,39 @@ class Webhook:
     id: Optional[str]               # Webhook ID
     url: str                        # Callback URL
     event: WebhookEvent             # Event type
+    device_id: Optional[str] = None # Associated device ID
+```
+
+#### Device
+
+```python
+class Device:
+    id: str                         # Unique device identifier
+    name: str                       # Device name
+    created_at: Optional[datetime] = None  # Creation timestamp
+    updated_at: Optional[datetime] = None  # Last update timestamp
+    deleted_at: Optional[datetime] = None  # Deletion timestamp
+    last_seen: Optional[datetime] = None   # Last seen timestamp
+```
+
+#### DeviceSettings
+
+```python
+class DeviceSettings:
+    gateway: Optional[SettingsGateway] = None      # Gateway settings
+    encryption: Optional[SettingsEncryption] = None # Encryption settings
+    messages: Optional[SettingsMessages] = None     # Message handling settings
+    logs: Optional[SettingsLogs] = None            # Logging settings
+    ping: Optional[SettingsPing] = None            # Ping settings
+    webhooks: Optional[SettingsWebhooks] = None    # Webhook settings
 ```
 
 #### TokenRequest
 
 ```python
 class TokenRequest:
-    scopes: List[str]               # List of scopes for the token
-    ttl: Optional[int] = None       # Time to live for the token in seconds
+    scopes: List[str]               # List of scopes for the token (required)
+    ttl: Optional[int] = None       # Time to live in seconds
 ```
 
 #### TokenResponse
@@ -345,9 +437,85 @@ class TokenRequest:
 ```python
 class TokenResponse:
     access_token: str               # The JWT access token
-    token_type: str                 # The type of the token (e.g., 'Bearer')
-    id: str                         # The unique identifier of the token (jti)
-    expires_at: str                 # The expiration time of the token in ISO format
+    token_type: str                 # Token type (e.g., 'Bearer')
+    id: str                         # Unique token identifier (jti)
+    expires_at: str                 # Expiration time in ISO format
+    refresh_token: Optional[str] = None  # Refresh token
+```
+
+#### HealthResponse
+
+```python
+class HealthResponse:
+    status: HealthStatus            # Overall health status
+    version: Optional[str] = None   # Application version
+    release_id: Optional[int] = None # Release ID
+    checks: Optional[Dict[str, HealthCheck]] = None  # Individual health checks
+```
+
+#### LogEntry
+
+```python
+class LogEntry:
+    id: int                         # Unique log entry ID
+    created_at: datetime            # Creation timestamp
+    message: str                    # Log message
+    priority: LogEntryPriority      # Priority level (DEBUG, INFO, WARN, ERROR)
+    module: Optional[str] = None    # Source module
+    context: Optional[Dict] = None  # Additional context
+```
+
+#### Enums
+
+```python
+class ProcessState(enum.Enum):
+    Pending = "Pending"
+    Processed = "Processed"
+    Sent = "Sent"
+    Delivered = "Delivered"
+    Failed = "Failed"
+
+class WebhookEvent(enum.Enum):
+    SMS_RECEIVED = "sms:received"
+    SMS_DATA_RECEIVED = "sms:data-received"
+    SMS_SENT = "sms:sent"
+    SMS_DELIVERED = "sms:delivered"
+    SMS_FAILED = "sms:failed"
+    SYSTEM_PING = "system:ping"
+    MMS_RECEIVED = "mms:received"
+    MMS_DOWNLOADED = "mms:downloaded"
+
+class MessagePriority(enum.IntEnum):
+    MINIMUM = -128
+    DEFAULT = 0
+    BYPASS_THRESHOLD = 100
+    MAXIMUM = 127
+
+class LimitPeriod(enum.Enum):
+    DISABLED = "Disabled"
+    PER_MINUTE = "PerMinute"
+    PER_HOUR = "PerHour"
+    PER_DAY = "PerDay"
+
+class SimSelectionMode(enum.Enum):
+    OS_DEFAULT = "OSDefault"
+    ROUND_ROBIN = "RoundRobin"
+    RANDOM = "Random"
+
+class MessagesProcessingOrder(enum.Enum):
+    LIFO = "LIFO"
+    FIFO = "FIFO"
+
+class HealthStatus(enum.Enum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+class LogEntryPriority(enum.Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
 ```
 
 For more details, see [`domain.py`](./android_sms_gateway/domain.py).
