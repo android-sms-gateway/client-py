@@ -38,6 +38,9 @@ class WebhookEvent(enum.Enum):
     MMS_DOWNLOADED = "mms:downloaded"
     """Triggered when an MMS is downloaded."""
 
+    APP_STARTED = "app:started"
+    """Triggered when the application is started."""
+
 
 class MessagePriority(enum.IntEnum):
     """Priority levels for messages."""
