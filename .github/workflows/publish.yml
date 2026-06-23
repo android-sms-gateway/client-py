@@ -19,11 +19,13 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - uses: actions/checkout@v7
         with:
-          python-version: "3.x"
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
       - name: Install pipenv
         run: |
@@ -31,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipenv install --deploy --dev
+          pipenv sync --dev
 
       - name: Build package
         run: |
