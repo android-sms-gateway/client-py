@@ -166,6 +166,18 @@ class APIClient(BaseClient):
             )
         )
 
+    def cancel_message(self, _id: str) -> None:
+        """
+        Cancels a pending message by ID.
+
+        Args:
+            _id: The message ID.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        self.http.delete(f"{self.base_url}/messages/{_id}", headers=self.headers)
+
     def get_state(self, _id: str) -> domain.MessageState:
         """
         Returns message state by ID.
@@ -581,6 +593,20 @@ class AsyncAPIClient(BaseClient):
                     headers=self.headers,
                 )
             )
+        )
+
+    async def cancel_message(self, _id: str) -> None:
+        """
+        Cancels a pending message by ID.
+
+        Args:
+            _id: The message ID.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        await self.http.delete(
+            f"{self.base_url}/messages/{_id}", headers=self.headers
         )
 
     async def get_state(self, _id: str) -> domain.MessageState:
