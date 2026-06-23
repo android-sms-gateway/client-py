@@ -3,6 +3,8 @@ import enum
 
 class ProcessState(enum.Enum):
     Pending = "Pending"
+    Cancelling = "Cancelling"
+    Cancelled = "Cancelled"
     Processed = "Processed"
     Sent = "Sent"
     Delivered = "Delivered"
@@ -28,6 +30,9 @@ class WebhookEvent(enum.Enum):
 
     SMS_FAILED = "sms:failed"
     """Triggered when an SMS processing fails."""
+
+    SMS_CANCELLED = "sms:cancelled"
+    """Triggered when an SMS is cancelled."""
 
     SYSTEM_PING = "system:ping"
     """Triggered when the device pings the server."""
