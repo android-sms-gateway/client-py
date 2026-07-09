@@ -202,13 +202,16 @@ class APIClient(BaseClient):
         *,
         query: t.Optional[domain.MessagesQueryFilter] = None,
         pagination: t.Optional[domain.QueryPagination] = None,
+        sort: t.Optional[t.Literal["created_at", "-created_at"]] = None,
     ) -> t.List[domain.MessageState]:
         """
-        Retrieves a list of messages with filtering and pagination.
+        Retrieves a list of messages with filtering, pagination, and sorting.
 
         Args:
             query: Optional query filter (date range, state, device ID).
             pagination: Optional pagination (limit, offset).
+            sort: Optional sort order (``"created_at"`` for ascending,
+                ``"-created_at"`` for descending).
 
         Returns:
             A list of message states.
@@ -221,6 +224,8 @@ class APIClient(BaseClient):
             params.update(query.asdict())
         if pagination is not None:
             params.update(pagination.asdict())
+        if sort is not None:
+            params["sort"] = sort
 
         qs = urlencode(params)
         url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
@@ -686,12 +691,16 @@ class AsyncAPIClient(BaseClient):
         *,
         query: t.Optional[domain.MessagesQueryFilter] = None,
         pagination: t.Optional[domain.QueryPagination] = None,
+        sort: t.Optional[t.Literal["created_at", "-created_at"]] = None,
     ) -> t.List[domain.MessageState]:
         """
-        Retrieves a list of messages with filtering and pagination.
+        Retrieves a list of messages with filtering, pagination, and sorting.
 
         Args:
-            request: The query request containing filters and pagination parameters.
+            query: Optional query filter (date range, state, device ID).
+            pagination: Optional pagination (limit, offset).
+            sort: Optional sort order (``"created_at"`` for ascending,
+                ``"-created_at"`` for descending).
 
         Returns:
             A list of message states.
@@ -704,6 +713,8 @@ class AsyncAPIClient(BaseClient):
             params.update(query.asdict())
         if pagination is not None:
             params.update(pagination.asdict())
+        if sort is not None:
+            params["sort"] = sort
 
         qs = urlencode(params)
         url = f"{self.base_url}/messages" + (f"?{qs}" if qs else "")
