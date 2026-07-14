@@ -13,6 +13,11 @@ class HttpClient(t.Protocol):
     ) -> dict: ...
 
     @abc.abstractmethod
+    def get_bytes(
+        self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+    ) -> bytes: ...
+
+    @abc.abstractmethod
     def post(
         self, url: str, payload: dict, *, headers: t.Optional[t.Dict[str, str]] = None
     ) -> dict: ...
@@ -79,6 +84,28 @@ try:
                 raise ValueError("Session not initialized")
 
             return self._process_response(self._session.get(url, headers=headers))
+
+        def get_bytes(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> bytes:
+            if self._session is None:
+                raise ValueError("Session not initialized")
+
+            response = self._session.get(url, headers=headers)
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                error_data = {}
+                try:
+                    if response.content:
+                        error_data = response.json()
+                except ValueError:
+                    pass
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(
+                    error_message, response.status_code, error_data
+                ) from e
+            return response.content
 
         def post(
             self,
@@ -209,6 +236,28 @@ try:
                 raise ValueError("Client not initialized")
 
             return self._process_response(self._client.get(url, headers=headers))
+
+        def get_bytes(
+            self, url: str, *, headers: t.Optional[t.Dict[str, str]] = None
+        ) -> bytes:
+            if self._client is None:
+                raise ValueError("Client not initialized")
+
+            response = self._client.get(url, headers=headers)
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                error_data = {}
+                try:
+                    if response.content:
+                        error_data = response.json()
+                except ValueError:
+                    pass
+                error_message = str(e) or "HTTP request failed"
+                raise error_from_status(
+                    error_message, response.status_code, error_data
+                ) from e
+            return response.content
 
         def post(
             self,

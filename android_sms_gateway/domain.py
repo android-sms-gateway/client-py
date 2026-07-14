@@ -855,3 +855,218 @@ class QueryPagination:
             params["offset"] = self.offset
 
         return params
+
+
+# Inbox types
+
+
+@dataclasses.dataclass(frozen=True)
+class IncomingMessageAttachment:
+    """Metadata for an MMS attachment returned by the inbox API."""
+
+    part_id: int
+    """Part ID of the attachment, corresponding to the _id in content://mms/part."""
+    name: str
+    """Display name of the attachment file."""
+    size: int
+    """Size of the attachment in bytes."""
+    content_type: str
+    """MIME type of the attachment (e.g. image/jpeg)."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "IncomingMessageAttachment":
+        """Creates an IncomingMessageAttachment instance from a dictionary."""
+        return cls(
+            part_id=payload["partId"],
+            name=payload["name"],
+            size=payload["size"],
+            content_type=payload["contentType"],
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class IncomingMessage:
+    """An incoming (received) message from the inbox."""
+
+    id: str
+    """The unique identifier of the message."""
+    message_type: str
+    """Message type (SMS, DATA_SMS, MMS, MMS_DOWNLOADED)."""
+    sender: str
+    """Sender phone number."""
+    content_preview: str
+    """A preview of the message content."""
+    created_at: datetime.datetime
+    """When the message was received."""
+    recipient: t.Optional[str] = None
+    """Recipient phone number (the device's number)."""
+    sim_number: t.Optional[int] = None
+    """SIM card number that received the message."""
+    attachments: t.Optional[t.List[IncomingMessageAttachment]] = None
+    """MMS attachment metadata (only present when include_attachments is true)."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "IncomingMessage":
+        """Creates an IncomingMessage instance from a dictionary."""
+        attachments = None
+        if "attachments" in payload and payload["attachments"] is not None:
+            attachments = [
+                IncomingMessageAttachment.from_dict(a)
+                for a in payload["attachments"]
+            ]
+
+        return cls(
+            id=payload["id"],
+            message_type=payload["type"],
+            sender=payload["sender"],
+            content_preview=payload["contentPreview"],
+            created_at=_parse_iso(payload["createdAt"]),
+            recipient=payload.get("recipient"),
+            sim_number=payload.get("simNumber"),
+            attachments=attachments,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class InboxQueryFilter:
+    """Filter parameters for inbox message queries."""
+
+    message_type: t.Optional[str] = None
+    """Filter by message type (SMS, DATA_SMS, MMS, MMS_DOWNLOADED)."""
+    from_: t.Optional[datetime.datetime] = None
+    """Start date in RFC3339 format."""
+    to: t.Optional[datetime.datetime] = None
+    """End date in RFC3339 format."""
+    device_id: t.Optional[str] = None
+    """Filter by device ID."""
+    include_attachments: t.Optional[bool] = None
+    """Include attachment metadata in response (for MMS messages)."""
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        """Returns a dictionary representation of the query parameters."""
+        params: t.Dict[str, t.Any] = {}
+        if self.message_type is not None:
+            params["type"] = self.message_type
+        if self.from_ is not None:
+            params["from"] = self.from_.isoformat()
+        if self.to is not None:
+            params["to"] = self.to.isoformat()
+        if self.device_id is not None:
+            params["deviceId"] = self.device_id
+        if self.include_attachments is not None:
+            params["includeAttachments"] = self.include_attachments
+        return params
+
+
+# MMS webhook payload types
+
+
+@dataclasses.dataclass(frozen=True)
+class MmsReceivedPayload:
+    """Payload of an mms:received event (MMS notification, not yet downloaded)."""
+
+    message_id: str
+    """The unique identifier of the message."""
+    phone_number: str
+    """The phone number of the sender."""
+    sender: str
+    """The phone number of the message sender."""
+    transaction_id: str
+    """Unique MMS transaction identifier."""
+    content_class: str
+    """MMS content classification."""
+    size: int
+    """Attachment size in bytes."""
+    received_at: datetime.datetime
+    """The timestamp when the MMS message was received."""
+    recipient: t.Optional[str] = None
+    """The phone number of the message recipient."""
+    sim_number: t.Optional[int] = None
+    """The SIM card number that received the message."""
+    subject: t.Optional[str] = None
+    """Message subject line."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MmsReceivedPayload":
+        """Creates an MmsReceivedPayload instance from a dictionary."""
+        return cls(
+            message_id=payload["messageId"],
+            phone_number=payload["phoneNumber"],
+            sender=payload["sender"],
+            transaction_id=payload["transactionId"],
+            content_class=payload["contentClass"],
+            size=payload["size"],
+            received_at=_parse_iso(payload["receivedAt"]),
+            recipient=payload.get("recipient"),
+            sim_number=payload.get("simNumber"),
+            subject=payload.get("subject"),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class MmsDownloadedAttachment:
+    """Metadata for a non-text MMS part (attachment)."""
+
+    part_id: int
+    """The _id from content://mms/part."""
+    content_type: str
+    """MIME type of the attachment (e.g. image/jpeg)."""
+    name: t.Optional[str] = None
+    """Filename of the attachment, if present."""
+    data: t.Optional[str] = None
+    """Base64-encoded attachment data, if available."""
+    size: t.Optional[int] = None
+    """Size in bytes, if known."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MmsDownloadedAttachment":
+        """Creates an MmsDownloadedAttachment instance from a dictionary."""
+        return cls(
+            part_id=payload["partId"],
+            content_type=payload["contentType"],
+            name=payload.get("name"),
+            data=payload.get("data"),
+            size=payload.get("size"),
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class MmsDownloadedPayload:
+    """Payload of an mms:downloaded event (fully downloaded MMS with attachments)."""
+
+    message_id: str
+    """The unique identifier of the message."""
+    phone_number: str
+    """The phone number of the sender."""
+    sender: str
+    """The phone number of the message sender."""
+    attachments: t.List[MmsDownloadedAttachment]
+    """Metadata for non-text MMS parts, including optional Base64 content."""
+    received_at: datetime.datetime
+    """The timestamp when the MMS message was received."""
+    recipient: t.Optional[str] = None
+    """The phone number of the message recipient."""
+    sim_number: t.Optional[int] = None
+    """The SIM card number that received the message."""
+    subject: t.Optional[str] = None
+    """Message subject line."""
+    body: t.Optional[str] = None
+    """Aggregated text content of the MMS message."""
+
+    @classmethod
+    def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MmsDownloadedPayload":
+        """Creates an MmsDownloadedPayload instance from a dictionary."""
+        return cls(
+            message_id=payload["messageId"],
+            phone_number=payload["phoneNumber"],
+            sender=payload["sender"],
+            attachments=[
+                MmsDownloadedAttachment.from_dict(a)
+                for a in payload.get("attachments", [])
+            ],
+            received_at=_parse_iso(payload["receivedAt"]),
+            recipient=payload.get("recipient"),
+            sim_number=payload.get("simNumber"),
+            subject=payload.get("subject"),
+            body=payload.get("body"),
+        )

@@ -519,6 +519,57 @@ class APIClient(BaseClient):
 
         self.http.delete(f"{self.base_url}/auth/token/{jti}", headers=self.headers)
 
+    def list_inbox_messages(
+        self,
+        *,
+        inbox_filter: t.Optional[domain.InboxQueryFilter] = None,
+        pagination: t.Optional[domain.QueryPagination] = None,
+    ) -> t.List[domain.IncomingMessage]:
+        """
+        Retrieves incoming messages from the inbox.
+
+        Args:
+            inbox_filter: Optional filter (message type, date range, device ID).
+            pagination: Optional pagination (limit, offset).
+
+        Returns:
+            A list of incoming messages.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params: t.Dict[str, t.Any] = {}
+        if inbox_filter is not None:
+            params.update(inbox_filter.asdict())
+        if pagination is not None:
+            params.update(pagination.asdict())
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/inbox" + (f"?{qs}" if qs else "")
+        return [
+            domain.IncomingMessage.from_dict(msg)
+            for msg in self.http.get(url, headers=self.headers)
+        ]
+
+    def download_attachment(self, message_id: str, part_id: int) -> bytes:
+        """
+        Downloads a raw MMS attachment by message ID and part ID.
+
+        Args:
+            message_id: The message ID.
+            part_id: The part ID from the attachment metadata.
+
+        Returns:
+            Raw bytes of the attachment content.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.get_bytes(
+            f"{self.base_url}/inbox/{message_id}/attachments/{part_id}",
+            headers=self.headers,
+        )
+
 
 class AsyncAPIClient(BaseClient):
     def __init__(
@@ -956,4 +1007,55 @@ class AsyncAPIClient(BaseClient):
 
         await self.http.delete(
             f"{self.base_url}/auth/token/{jti}", headers=self.headers
+        )
+
+    async def list_inbox_messages(
+        self,
+        *,
+        inbox_filter: t.Optional[domain.InboxQueryFilter] = None,
+        pagination: t.Optional[domain.QueryPagination] = None,
+    ) -> t.List[domain.IncomingMessage]:
+        """
+        Retrieves incoming messages from the inbox.
+
+        Args:
+            inbox_filter: Optional filter (message type, date range, device ID).
+            pagination: Optional pagination (limit, offset).
+
+        Returns:
+            A list of incoming messages.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        params: t.Dict[str, t.Any] = {}
+        if inbox_filter is not None:
+            params.update(inbox_filter.asdict())
+        if pagination is not None:
+            params.update(pagination.asdict())
+
+        qs = urlencode(params)
+        url = f"{self.base_url}/inbox" + (f"?{qs}" if qs else "")
+        return [
+            domain.IncomingMessage.from_dict(msg)
+            for msg in await self.http.get(url, headers=self.headers)
+        ]
+
+    async def download_attachment(self, message_id: str, part_id: int) -> bytes:
+        """
+        Downloads a raw MMS attachment by message ID and part ID.
+
+        Args:
+            message_id: The message ID.
+            part_id: The part ID from the attachment metadata.
+
+        Returns:
+            Raw bytes of the attachment content.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.get_bytes(
+            f"{self.base_url}/inbox/{message_id}/attachments/{part_id}",
+            headers=self.headers,
         )
