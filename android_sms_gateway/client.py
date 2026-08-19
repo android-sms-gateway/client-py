@@ -236,6 +236,8 @@ class APIClient(BaseClient):
 
     def export_inbox(self, request: domain.MessagesExportRequest) -> t.Dict[str, t.Any]:
         """
+        Deprecated: use refresh_inbox instead.
+
         Initiates process of inbox messages export via webhooks.
 
         Args:
@@ -249,6 +251,25 @@ class APIClient(BaseClient):
 
         return self.http.post(
             f"{self.base_url}/messages/inbox/export",
+            payload=request.asdict(),
+            headers=self.headers,
+        )
+
+    def refresh_inbox(self, request: domain.InboxRefreshRequest) -> t.Dict[str, t.Any]:
+        """
+        Initiates process of inbox messages refresh.
+
+        Args:
+            request: The refresh request containing device ID and time range.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return self.http.post(
+            f"{self.base_url}/inbox/refresh",
             payload=request.asdict(),
             headers=self.headers,
         )
@@ -661,9 +682,7 @@ class AsyncAPIClient(BaseClient):
         if self.http is None:
             raise ValueError("HTTP client not initialized")
 
-        await self.http.delete(
-            f"{self.base_url}/messages/{_id}", headers=self.headers
-        )
+        await self.http.delete(f"{self.base_url}/messages/{_id}", headers=self.headers)
 
     async def get_state(self, _id: str) -> domain.MessageState:
         """
@@ -727,6 +746,8 @@ class AsyncAPIClient(BaseClient):
         self, request: domain.MessagesExportRequest
     ) -> t.Dict[str, t.Any]:
         """
+        Deprecated: use refresh_inbox instead.
+
         Initiates process of inbox messages export via webhooks.
 
         Args:
@@ -740,6 +761,27 @@ class AsyncAPIClient(BaseClient):
 
         return await self.http.post(
             f"{self.base_url}/messages/inbox/export",
+            payload=request.asdict(),
+            headers=self.headers,
+        )
+
+    async def refresh_inbox(
+        self, request: domain.InboxRefreshRequest
+    ) -> t.Dict[str, t.Any]:
+        """
+        Initiates process of inbox messages refresh.
+
+        Args:
+            request: The refresh request containing device ID and time range.
+
+        Returns:
+            A dictionary containing the response.
+        """
+        if self.http is None:
+            raise ValueError("HTTP client not initialized")
+
+        return await self.http.post(
+            f"{self.base_url}/inbox/refresh",
             payload=request.asdict(),
             headers=self.headers,
         )

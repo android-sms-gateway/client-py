@@ -46,6 +46,31 @@ class WebhookEvent(enum.Enum):
     APP_STARTED = "app:started"
     """Triggered when the application is started."""
 
+    SMS_BATCH_RECEIVED = "sms:batch:received"
+    """Triggered when a batch of SMS messages is received."""
+
+    SMS_DATA_BATCH_RECEIVED = "sms:batch:data-received"
+    """Triggered when a batch of data SMS messages is received."""
+
+    MMS_BATCH_RECEIVED = "mms:batch:received"
+    """Triggered when a batch of MMS messages is received."""
+
+    MMS_BATCH_DOWNLOADED = "mms:batch:downloaded"
+    """Triggered when a batch of MMS messages is downloaded."""
+
+
+class WebhookDelivery(enum.Enum):
+    """Delivery mode for webhooks."""
+
+    DISABLED = "Disabled"
+    """Disable webhook delivery."""
+
+    INDIVIDUAL = "Individual"
+    """Deliver webhooks individually (one per message)."""
+
+    BATCH = "Batch"
+    """Deliver webhooks as ordered batches."""
+
 
 class MessagePriority(enum.IntEnum):
     """Priority levels for messages."""

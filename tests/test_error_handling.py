@@ -253,3 +253,103 @@ class TestHttpxAsyncHttpClientErrorHandling:
 
         assert exc_info.value.status_code == 404
         assert exc_info.value.response == {"error": "not found"}
+
+
+class TestEmptyBodyHandling:
+    """Test empty-body success handling (202 Accepted, no content)."""
+
+    def test_requests_returns_empty_dict_for_202_empty_body(self):
+        """Tests that RequestsHttpClient returns {} for a 202 empty body."""
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_response.content = b""
+
+        client = RequestsHttpClient()
+
+        assert client._process_response(mock_response) == {}
+
+    def test_httpx_returns_empty_dict_for_202_empty_body(self):
+        """Tests that HttpxHttpClient returns {} for a 202 empty body."""
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_response.content = b""
+
+        client = HttpxHttpClient()
+
+        assert client._process_response(mock_response) == {}
+
+    @pytest.mark.asyncio
+    async def test_httpx_async_returns_empty_dict_for_202_empty_body(self):
+        """Tests that HttpxAsyncHttpClient returns {} for a 202 empty body."""
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_response.content = b""
+
+        client = HttpxAsyncHttpClient()
+
+        assert await client._process_response(mock_response) == {}
+
+    @pytest.mark.asyncio
+    async def test_aiohttp_returns_empty_dict_for_202_empty_body(self):
+        """
+        Tests that AiohttpAsyncHttpClient returns {} for a 202 empty body
+        without Content-Type (json() raises ContentTypeError).
+        """
+        json = AsyncMock(
+            side_effect=aiohttp.ContentTypeError(
+                request_info=Mock(),
+                history=(),
+                message="Attempt to decode JSON with unexpected mimetype",
+            )
+        )
+
+        mock_response = Mock()
+        mock_response.status = 202
+        mock_response.json = json
+
+        client = AiohttpAsyncHttpClient()
+
+        assert await client._process_response(mock_response) == {}
+
+
+class TestInternalServerErrorHandling:
+    """Test 500 error status handling (refresh_inbox error path)."""
+
+    def test_requests_raises_internal_server_error_for_500(self):
+        """Tests that RequestsHttpClient maps 500 to InternalServerError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.content = b'{"message": "boom"}'
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "500 Server Error"
+        )
+        mock_response.json.return_value = {"message": "boom"}
+
+        client = RequestsHttpClient()
+
+        with pytest.raises(InternalServerError) as exc_info:
+            client._process_response(mock_response)
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.response == {"message": "boom"}
+
+    @pytest.mark.asyncio
+    async def test_aiohttp_raises_internal_server_error_for_500(self):
+        """Tests that AiohttpAsyncHttpClient maps 500 to InternalServerError."""
+        json = AsyncMock()
+        json.return_value = {"message": "boom"}
+
+        mock_response = Mock()
+        mock_response.status = 500
+        mock_response.raise_for_status.side_effect = aiohttp.ClientResponseError(
+            request_info=Mock(), history=(), status=500, message="500 Server Error"
+        )
+        mock_response.json = json
+
+        client = AiohttpAsyncHttpClient()
+
+        with pytest.raises(InternalServerError) as exc_info:
+            await client._process_response(mock_response)
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.response == {"message": "boom"}
