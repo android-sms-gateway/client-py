@@ -1,7 +1,7 @@
 import pytest
 import datetime
 
-from android_sms_gateway.enums import WebhookEvent, MessagePriority
+from android_sms_gateway.enums import WebhookEvent, MessagePriority, WebhookDelivery
 from android_sms_gateway.domain import (
     MessageState,
     RecipientState,
@@ -9,6 +9,7 @@ from android_sms_gateway.domain import (
     Message,
     TextMessage,
     DataMessage,
+    InboxRefreshRequest,
 )
 
 
@@ -483,3 +484,96 @@ def test_message_serialization_format_for_data_message():
     }
 
     assert message.asdict() == expected_dict
+
+
+# Inbox refresh request
+
+
+def test_inbox_refresh_request_asdict_includes_device_id():
+    """
+    Tests that InboxRefreshRequest.asdict includes deviceId when device_id
+    is set, along with ISO-8601 since/until values.
+    """
+    since = datetime.datetime(2026, 8, 1, 10, 0, 0)
+    until = datetime.datetime(2026, 8, 2, 10, 0, 0)
+    request = InboxRefreshRequest(
+        since=since,
+        until=until,
+        device_id="device_1",
+    )
+
+    result = request.asdict()
+
+    assert result["deviceId"] == "device_1"
+    assert result["since"] == "2026-08-01T10:00:00"
+    assert result["until"] == "2026-08-02T10:00:00"
+
+
+def test_inbox_refresh_request_asdict_omits_device_id_when_none():
+    """
+    Tests that InboxRefreshRequest.asdict omits deviceId when device_id
+    is None.
+    """
+    request = InboxRefreshRequest(
+        since=datetime.datetime(2026, 8, 1),
+        until=datetime.datetime(2026, 8, 2),
+        device_id=None,
+    )
+
+    assert "deviceId" not in request.asdict()
+
+
+def test_inbox_refresh_request_asdict_since_until_iso_8601():
+    """
+    Tests that since/until serialize to ISO-8601 strings in
+    InboxRefreshRequest.asdict.
+    """
+    since = datetime.datetime(2026, 8, 1, 10, 30, 15)
+    until = since + datetime.timedelta(hours=2)
+
+    result = InboxRefreshRequest(since=since, until=until).asdict()
+
+    assert result["since"] == since.isoformat()
+    assert result["until"] == until.isoformat()
+    assert isinstance(result["since"], str)
+    assert isinstance(result["until"], str)
+
+
+def test_inbox_refresh_request_asdict_optional_fields():
+    """
+    Tests that InboxRefreshRequest.asdict includes messageTypes,
+    triggerWebhooks and webhookDelivery when set, and omits them when None.
+    """
+    since = datetime.datetime(2026, 8, 1)
+    until = datetime.datetime(2026, 8, 2)
+
+    full = InboxRefreshRequest(
+        since=since,
+        until=until,
+        message_types=["SMS", "DATA_SMS", "MMS", "MMS_DOWNLOADED"],
+        webhook_delivery=WebhookDelivery.BATCH,
+    )
+    result = full.asdict()
+    assert result["messageTypes"] == ["SMS", "DATA_SMS", "MMS", "MMS_DOWNLOADED"]
+    assert result["webhookDelivery"] == "Batch"
+
+    minimal = InboxRefreshRequest(since=since, until=until)
+    result = minimal.asdict()
+    assert "messageTypes" not in result
+    assert "webhookDelivery" not in result
+
+
+def test_mms_payload_types_importable_from_domain():
+    """
+    Regression test: MMS webhook payload types must remain importable from
+    android_sms_gateway.domain (defined in .webhooks but re-exported for
+    backward compatibility with master).
+    """
+    import android_sms_gateway
+    import android_sms_gateway.domain as domain
+    from android_sms_gateway import webhooks
+
+    for name in ("MmsReceivedPayload", "MmsDownloadedPayload", "MmsDownloadedAttachment"):
+        assert hasattr(domain, name), f"android_sms_gateway.domain.{name} is missing"
+        assert hasattr(android_sms_gateway, name), f"android_sms_gateway.{name} is missing"
+        assert getattr(domain, name) is getattr(webhooks, name)

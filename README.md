@@ -43,6 +43,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
     - [Client Configuration](#client-configuration)
     - [Available Methods](#available-methods)
       - [Message Methods](#message-methods)
+      - [Inbox methods](#inbox-methods)
       - [Webhook Methods](#webhook-methods)
       - [Device Methods](#device-methods)
       - [Settings Methods](#settings-methods)
@@ -53,6 +54,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
       - [Message](#message)
       - [MessageState](#messagestate)
       - [Webhook](#webhook)
+      - [InboxRefreshRequest](#inboxrefreshrequest)
       - [Device](#device)
       - [DeviceSettings](#devicesettings)
       - [TokenRequest](#tokenrequest)
@@ -93,7 +95,7 @@ This client abstracts away the complexities of the underlying HTTP API while pro
 - 📝 **Logging**: Retrieve system logs with time range filtering
 - 🏥 **Health Checks**: Liveness, readiness, and startup probes
 - 📱 **Device Management**: List and remove registered devices
-- 📥 **Inbox Export**: Export received messages via webhooks
+- 📥 **Inbox Refresh**: Refresh device inboxes with webhook delivery (individual or batch)
 
 ## ⚙️ Requirements
 
@@ -305,12 +307,19 @@ Both clients (`APIClient` and `AsyncAPIClient`) support these parameters:
 
 #### Message Methods
 
-| Method                                                                  | Description                        | Return Type                 |
-| ----------------------------------------------------------------------- | ---------------------------------- | --------------------------- |
-| `send(message, *, skip_phone_validation=False, device_active_within=0)` | Send SMS message                   | `domain.MessageState`       |
-| `get_state(id)`                                                         | Get message state by ID            | `domain.MessageState`       |
-| `get_messages(*, filter=None, pagination=None)`                         | List messages with filtering       | `List[domain.MessageState]` |
-| `export_inbox(request)`                                                 | Export inbox messages via webhooks | `dict`                      |
+| Method                                                                  | Description                  | Return Type                 |
+| ----------------------------------------------------------------------- | ---------------------------- | --------------------------- |
+| `send(message, *, skip_phone_validation=False, device_active_within=0)` | Send SMS message             | `domain.MessageState`       |
+| `get_state(id)`                                                         | Get message state by ID      | `domain.MessageState`       |
+| `get_messages(*, query=None, pagination=None)`                          | List messages with filtering | `List[domain.MessageState]` |
+
+#### Inbox methods
+
+| Method                                                       | Description            | Return Type             |
+| ------------------------------------------------------------ | ---------------------- | ----------------------- |
+| `list_inbox_messages(*, inbox_filter=None, pagination=None)` | List inbox messages    | `List[IncomingMessage]` |
+| `refresh_inbox(request)`                                     | Refresh inbox messages | `dict`                  |
+| `download_attachment(message_id, part_id)`                   | Download attachment    | `bytes`                 |
 
 #### Webhook Methods
 
@@ -400,6 +409,17 @@ class Webhook:
     device_id: Optional[str] = None # Associated device ID
 ```
 
+#### InboxRefreshRequest
+
+```python
+class InboxRefreshRequest:
+    since: datetime                              # Start of time range (required)
+    until: datetime                              # End of time range (required)
+    device_id: Optional[str] = None              # Device ID to refresh messages for
+    message_types: Optional[List[str]] = None    # SMS, DATA_SMS, MMS, MMS_DOWNLOADED
+    webhook_delivery: Optional[WebhookDelivery] = None  # Delivery mode
+```
+
 #### Device
 
 ```python
@@ -484,6 +504,15 @@ class WebhookEvent(enum.Enum):
     SYSTEM_PING = "system:ping"
     MMS_RECEIVED = "mms:received"
     MMS_DOWNLOADED = "mms:downloaded"
+    SMS_BATCH_RECEIVED = "sms:batch:received"
+    SMS_DATA_BATCH_RECEIVED = "sms:batch:data-received"
+    MMS_BATCH_RECEIVED = "mms:batch:received"
+    MMS_BATCH_DOWNLOADED = "mms:batch:downloaded"
+
+class WebhookDelivery(enum.Enum):
+    DISABLED = "Disabled"
+    INDIVIDUAL = "Individual"
+    BATCH = "Batch"
 
 class MessagePriority(enum.IntEnum):
     MINIMUM = -128
