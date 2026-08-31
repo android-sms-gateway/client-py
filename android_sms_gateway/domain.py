@@ -37,6 +37,7 @@ class Message:
         phone_numbers (List[str]): Recipients (phone numbers).
         text_message (Optional[TextMessage]): Text message.
         data_message (Optional[DataMessage]): Data message.
+        mms_message (Optional[MmsMessage]): MMS message.
         priority (Optional[MessagePriority]): Priority.
         sim_number (Optional[int]): SIM card number (1-3), if not set - default SIM will be used.
         with_delivery_report (bool): With delivery report.
@@ -50,6 +51,7 @@ class Message:
     phone_numbers: t.List[str]
     text_message: t.Optional["TextMessage"] = None
     data_message: t.Optional["DataMessage"] = None
+    mms_message: t.Optional["MmsMessage"] = None
 
     priority: t.Optional[MessagePriority] = None
     sim_number: t.Optional[int] = None
@@ -169,6 +171,56 @@ class TextMessage:
         return cls(
             text=payload["text"],
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class MmsAttachment:
+    """
+    Represents a single attachment of an MMS message.
+
+    Attributes:
+        content_type (str): MIME type of the attachment (e.g. image/png).
+        data (str): Base64-encoded attachment content.
+        name (Optional[str]): Optional file name of the attachment.
+    """
+
+    content_type: str
+    data: str
+    name: t.Optional[str] = None
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        result: t.Dict[str, t.Any] = {"contentType": self.content_type}
+        if self.name is not None:
+            result["name"] = self.name
+        result["data"] = self.data
+        return result
+
+
+@dataclasses.dataclass(frozen=True)
+class MmsMessage:
+    """
+    Represents an MMS message with optional subject, text and attachments.
+
+    Attributes:
+        subject (Optional[str]): Optional subject of the MMS.
+        text (Optional[str]): Optional text body of the MMS.
+        attachments (Optional[List[MmsAttachment]]): List of attachments.
+            Omitted from the wire entirely when empty or None.
+    """
+
+    subject: t.Optional[str] = None
+    text: t.Optional[str] = None
+    attachments: t.Optional[t.List[MmsAttachment]] = None
+
+    def asdict(self) -> t.Dict[str, t.Any]:
+        result: t.Dict[str, t.Any] = {}
+        if self.subject is not None:
+            result["subject"] = self.subject
+        if self.text is not None:
+            result["text"] = self.text
+        if self.attachments:
+            result["attachments"] = [a.asdict() for a in self.attachments]
+        return result
 
 
 @dataclasses.dataclass(frozen=True)

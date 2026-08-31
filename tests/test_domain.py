@@ -1,3 +1,4 @@
+import json
 import pytest
 import datetime
 
@@ -9,6 +10,8 @@ from android_sms_gateway.domain import (
     Message,
     TextMessage,
     DataMessage,
+    MmsAttachment,
+    MmsMessage,
     InboxRefreshRequest,
 )
 
@@ -577,3 +580,150 @@ def test_mms_payload_types_importable_from_domain():
         assert hasattr(domain, name), f"android_sms_gateway.domain.{name} is missing"
         assert hasattr(android_sms_gateway, name), f"android_sms_gateway.{name} is missing"
         assert getattr(domain, name) is getattr(webhooks, name)
+
+
+# MMS message serialization
+
+
+def _locked_mms_message() -> MmsMessage:
+    """Builds the shared locked-fixture MmsMessage."""
+    return MmsMessage(
+        subject="Hello",
+        text="World",
+        attachments=[
+            MmsAttachment(
+                content_type="image/png",
+                name="picture.png",
+                data="BASE64DATA",
+            )
+        ],
+    )
+
+
+def test_mms_attachment_asdict_omits_none_name():
+    """MmsAttachment.asdict emits contentType and data, omits name when None."""
+    attachment = MmsAttachment(content_type="image/png", data="BASE64DATA")
+
+    assert attachment.asdict() == {
+        "contentType": "image/png",
+        "data": "BASE64DATA",
+    }
+
+
+def test_mms_attachment_asdict_includes_name_when_set():
+    """MmsAttachment.asdict includes name when set (Go omitempty pointer parity)."""
+    attachment = MmsAttachment(
+        content_type="image/png",
+        name="picture.png",
+        data="BASE64DATA",
+    )
+
+    assert attachment.asdict() == {
+        "contentType": "image/png",
+        "name": "picture.png",
+        "data": "BASE64DATA",
+    }
+
+
+def test_mms_message_asdict_omits_none_fields():
+    """MmsMessage.asdict emits only explicit non-None fields."""
+    assert MmsMessage().asdict() == {}
+    assert MmsMessage(text="World").asdict() == {"text": "World"}
+    assert MmsMessage(subject="Hello").asdict() == {"subject": "Hello"}
+
+
+def test_mms_message_asdict_omits_empty_attachments():
+    """MmsMessage.asdict omits attachments when None or empty (Go omitempty parity)."""
+    assert "attachments" not in MmsMessage(text="World").asdict()
+    assert "attachments" not in MmsMessage(text="World", attachments=[]).asdict()
+
+
+def test_mms_message_asdict_emits_attachments_when_present():
+    """MmsMessage.asdict emits attachments when non-empty."""
+    mms = _locked_mms_message()
+
+    assert mms.asdict() == {
+        "subject": "Hello",
+        "text": "World",
+        "attachments": [
+            {
+                "contentType": "image/png",
+                "name": "picture.png",
+                "data": "BASE64DATA",
+            }
+        ],
+    }
+
+
+def test_mms_message_serialization_matches_locked_fixture_byte_for_byte():
+    """MmsMessage serializes byte-for-byte to the shared locked wire fixture."""
+    mms = _locked_mms_message()
+
+    actual = json.dumps(mms.asdict(), separators=(",", ":"))
+
+    assert actual == (
+        '{"subject":"Hello","text":"World","attachments":'
+        '[{"contentType":"image/png","name":"picture.png","data":"BASE64DATA"}]}'
+    )
+
+
+def test_message_asdict_with_mms_message_matches_locked_fixture_byte_for_byte():
+    """Full Message envelope serializes mmsMessage verbatim (Go omitempty parity)."""
+    message = Message(
+        phone_numbers=["79990001234"],
+        mms_message=_locked_mms_message(),
+    )
+
+    actual = json.dumps(message.asdict(), separators=(",", ":"))
+
+    assert actual == (
+        '{"phoneNumbers":["79990001234"],'
+        '"mmsMessage":{"subject":"Hello","text":"World","attachments":'
+        '[{"contentType":"image/png","name":"picture.png","data":"BASE64DATA"}]},'
+        '"withDeliveryReport":true,"isEncrypted":false}'
+    )
+
+
+def test_message_asdict_omits_mms_message_when_unset():
+    """Message.asdict omits mmsMessage entirely when None."""
+    message = Message(
+        phone_numbers=["123"],
+        text_message=TextMessage(text="hi"),
+    )
+
+    assert "mmsMessage" not in message.asdict()
+
+
+def test_message_asdict_mms_message_omits_empty_attachments():
+    """Message envelope with MMS text-only payload omits attachments."""
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=MmsMessage(text="World"),
+    )
+
+    mms = message.asdict()["mmsMessage"]
+    assert mms == {"text": "World"}
+    assert "attachments" not in mms
+
+
+def test_message_asdict_mms_message_partial_fields():
+    """Only explicit MMS fields are emitted; None subject/text/name stay absent."""
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=MmsMessage(
+            subject="Hello",
+            attachments=[
+                MmsAttachment(content_type="image/png", data="BASE64DATA"),
+            ],
+        ),
+    )
+
+    mms = message.asdict()["mmsMessage"]
+    assert mms == {
+        "subject": "Hello",
+        "attachments": [
+            {"contentType": "image/png", "data": "BASE64DATA"},
+        ],
+    }
+    assert "text" not in mms
+    assert "name" not in mms["attachments"][0]
