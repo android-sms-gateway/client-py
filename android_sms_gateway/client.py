@@ -64,6 +64,39 @@ class BaseClient(abc.ABC):
                 if message.data_message
                 else None
             ),
+            mms_message=(
+                dataclasses.replace(
+                    message.mms_message,
+                    subject=(
+                        self.encryptor.encrypt(message.mms_message.subject)
+                        if message.mms_message.subject is not None
+                        else None
+                    ),
+                    text=(
+                        self.encryptor.encrypt(message.mms_message.text)
+                        if message.mms_message.text is not None
+                        else None
+                    ),
+                    attachments=(
+                        [
+                            dataclasses.replace(
+                                attachment,
+                                data=self.encryptor.encrypt(attachment.data),
+                                name=(
+                                    self.encryptor.encrypt(attachment.name)
+                                    if attachment.name is not None
+                                    else None
+                                ),
+                            )
+                            for attachment in message.mms_message.attachments
+                        ]
+                        if message.mms_message.attachments is not None
+                        else None
+                    ),
+                )
+                if message.mms_message
+                else None
+            ),
             phone_numbers=[
                 self.encryptor.encrypt(phone) for phone in message.phone_numbers
             ],

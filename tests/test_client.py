@@ -9,7 +9,12 @@ from android_sms_gateway.domain import (
     Webhook,
     InboxRefreshRequest,
     MessagesExportRequest,
+    Message,
+    TextMessage,
+    MmsAttachment,
+    MmsMessage,
 )
+from android_sms_gateway.encryption import AESEncryptor
 from android_sms_gateway.enums import WebhookDelivery, WebhookEvent
 from android_sms_gateway.http import RequestsHttpClient
 from android_sms_gateway import errors
@@ -342,3 +347,190 @@ def test_async_export_inbox_posts_request_to_messages_inbox_export():
     assert len(stub.calls) == 1
     assert stub.calls[0]["url"] == "https://example.com/messages/inbox/export"
     assert stub.calls[0]["payload"] == request.asdict()
+
+
+# MMS E2E encryption via the extended _encrypt helper
+
+
+def _mms_message():
+    return MmsMessage(
+        subject="Hello",
+        text="World",
+        attachments=[
+            MmsAttachment(
+                content_type="image/png",
+                name="picture.png",
+                data="BASE64DATA",
+            ),
+            MmsAttachment(content_type="image/jpeg", data="OTHERDATA"),
+        ],
+    )
+
+
+def test_encrypt_mms_message_round_trip():
+    """
+    _encrypt encrypts MMS subject/text/attachment.data/attachment.name with
+    the existing AESEncryptor and each field decrypts back to the original.
+    """
+    encryptor = AESEncryptor("passphrase", iterations=1000)
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        http=StubHttpClient({}),
+        encryptor=encryptor,
+    )
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=_mms_message(),
+    )
+
+    encrypted = client._encrypt(message)
+
+    assert encrypted.is_encrypted is True
+    assert encrypted.phone_numbers != message.phone_numbers
+    assert encrypted.mms_message is not None
+    assert encrypted.mms_message.subject != "Hello"
+    assert encrypted.mms_message.text != "World"
+    assert encrypted.mms_message.attachments[0].name != "picture.png"
+    assert encrypted.mms_message.attachments[0].data != "BASE64DATA"
+    assert encrypted.mms_message.attachments[1].name is None
+    assert encrypted.mms_message.attachments[1].data != "OTHERDATA"
+
+    assert encryptor.decrypt(encrypted.mms_message.subject) == "Hello"
+    assert encryptor.decrypt(encrypted.mms_message.text) == "World"
+    assert (
+        encryptor.decrypt(encrypted.mms_message.attachments[0].name)
+        == "picture.png"
+    )
+    assert (
+        encryptor.decrypt(encrypted.mms_message.attachments[0].data)
+        == "BASE64DATA"
+    )
+    assert encryptor.decrypt(encrypted.mms_message.attachments[1].data) == "OTHERDATA"
+    assert encrypted.mms_message.attachments[1].name is None
+
+
+def test_encrypt_mms_message_omits_empty_attachments_and_none_fields():
+    """
+    _encrypt preserves None subject/text and empty attachments so the wire
+    body keeps omitting them (Go omitempty parity after encryption).
+    """
+    encryptor = AESEncryptor("passphrase", iterations=1000)
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        http=StubHttpClient({}),
+        encryptor=encryptor,
+    )
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=MmsMessage(attachments=[]),
+    )
+
+    encrypted = client._encrypt(message)
+
+    mms = encrypted.mms_message
+    assert mms.subject is None
+    assert mms.text is None
+    assert mms.attachments == []
+    payload = encrypted.asdict()["mmsMessage"]
+    assert payload == {}
+
+
+def test_send_posts_encrypted_mms_payload():
+    """
+    send() encrypts the MMS payload before posting; the wire body carries
+    encrypted subject/text/data and omits unset name/attachments.
+    """
+    encryptor = AESEncryptor("passphrase", iterations=1000)
+    stub = StubHttpClient(
+        {
+            "id": "msg_1",
+            "state": "Pending",
+            "recipients": [
+                {
+                    "phoneNumber": encryptor.encrypt("123"),
+                    "state": "Pending",
+                }
+            ],
+            "isEncrypted": True,
+            "isHashed": False,
+        }
+    )
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        http=stub,
+        encryptor=encryptor,
+    )
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=MmsMessage(
+            text="World",
+            attachments=[
+                MmsAttachment(content_type="image/png", data="BASE64DATA"),
+            ],
+        ),
+    )
+
+    result = client.send(message)
+
+    assert result.id == "msg_1"
+    assert len(stub.calls) == 1
+    payload = stub.calls[0]["payload"]
+    assert payload["isEncrypted"] is True
+    assert payload["phoneNumbers"] != ["123"]
+    assert encryptor.decrypt(payload["phoneNumbers"][0]) == "123"
+    mms = payload["mmsMessage"]
+    assert "subject" not in mms
+    assert mms["text"] != "World"
+    assert encryptor.decrypt(mms["text"]) == "World"
+    assert len(mms["attachments"]) == 1
+    attachment = mms["attachments"][0]
+    assert attachment["contentType"] == "image/png"
+    assert "name" not in attachment
+    assert attachment["data"] != "BASE64DATA"
+    assert encryptor.decrypt(attachment["data"]) == "BASE64DATA"
+
+
+def test_encrypt_returns_message_unchanged_without_encryptor():
+    """
+    _encrypt returns the original message untouched when no encryptor is set.
+    """
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        http=StubHttpClient({}),
+    )
+    message = Message(
+        phone_numbers=["123"],
+        mms_message=_mms_message(),
+    )
+
+    assert client._encrypt(message) is message
+
+
+def test_encrypt_already_encrypted_message_raises():
+    """
+    _encrypt rejects messages that are already marked encrypted.
+    """
+    encryptor = AESEncryptor("passphrase", iterations=1000)
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        http=StubHttpClient({}),
+        encryptor=encryptor,
+    )
+    message = Message(
+        phone_numbers=["123"],
+        text_message=TextMessage(text="hi"),
+        is_encrypted=True,
+    )
+
+    with pytest.raises(ValueError, match="already encrypted"):
+        client._encrypt(message)
