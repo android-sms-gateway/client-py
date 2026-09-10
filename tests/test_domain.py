@@ -91,6 +91,62 @@ def test_message_state_from_dict_incorrect_types():
         MessageState.from_dict(incorrect_payload)
 
 
+def test_message_state_from_dict_with_created_at():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [{"phoneNumber": "123", "state": "Pending"}],
+        "isHashed": True,
+        "isEncrypted": False,
+        "createdAt": "2026-08-23T10:30:15Z",
+    }
+
+    message_state = MessageState.from_dict(payload)
+
+    assert isinstance(message_state.created_at, datetime.datetime)
+    assert message_state.created_at == datetime.datetime.fromisoformat(
+        "2026-08-23T10:30:15+00:00"
+    )
+
+
+def test_message_state_created_at_defaults_to_none_when_absent():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [{"phoneNumber": "123", "state": "Pending"}],
+    }
+
+    message_state = MessageState.from_dict(payload)
+
+    assert message_state.created_at is None
+
+
+def test_message_state_created_at_none_value():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [{"phoneNumber": "123", "state": "Pending"}],
+        "createdAt": None,
+    }
+
+    message_state = MessageState.from_dict(payload)
+
+    assert message_state.created_at is None
+
+
+def test_message_state_created_at_malformed_does_not_crash():
+    payload = {
+        "id": "123",
+        "state": "Pending",
+        "recipients": [{"phoneNumber": "123", "state": "Pending"}],
+        "createdAt": "not-a-valid-timestamp",
+    }
+
+    message_state = MessageState.from_dict(payload)
+
+    assert message_state.created_at is None
+
+
 def test_webhook_from_dict():
     """
     Tests that a Webhook instance can be successfully instantiated from a dictionary

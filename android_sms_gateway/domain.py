@@ -195,9 +195,18 @@ class MessageState:
     is_encrypted: bool
     device_id: t.Optional[str] = None
     states: t.Optional[t.Dict[str, str]] = None
+    created_at: t.Optional[datetime.datetime] = None
+    """The timestamp when the message was created."""
 
     @classmethod
     def from_dict(cls, payload: t.Dict[str, t.Any]) -> "MessageState":
+        created_at = None
+        raw_created_at = payload.get("createdAt")
+        if raw_created_at is not None:
+            try:
+                created_at = _parse_iso(raw_created_at)
+            except (AttributeError, TypeError, ValueError):
+                created_at = None
         return cls(
             id=payload["id"],
             device_id=payload.get("deviceId"),
@@ -209,6 +218,7 @@ class MessageState:
             is_hashed=payload.get("isHashed", False),
             is_encrypted=payload.get("isEncrypted", False),
             states=payload.get("states"),
+            created_at=created_at,
         )
 
 
