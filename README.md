@@ -20,14 +20,20 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
   - [📚 Table of Contents](#-table-of-contents)
   - [⭐ Features](#-features)
   - [📦 Installation](#-installation)
+  - [🚀 Getting Started](#-getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Quick Setup](#quick-setup)
   - [🔑 Authentication](#-authentication)
     - [Basic Authentication](#basic-authentication)
     - [JWT Authentication](#jwt-authentication)
   - [🚀 Quickstart](#-quickstart)
   - [💻 Usage](#-usage)
   - [📖 API Reference](#-api-reference)
+  - [🗺️ Roadmap](#️-roadmap)
   - [🤝 Contributing](#-contributing)
+  - [📞 Contact](#-contact)
   - [📄 License](#-license)
+  - [🙏 Acknowledgments](#-acknowledgments)
 
 ## ⭐ Features
 
@@ -53,6 +59,42 @@ pip install android-sms-gateway[httpx]       # httpx backend (sync + async)
 pip install android-sms-gateway[encryption]  # end-to-end encryption (pycryptodome)
 ```
 
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.9 or higher
+- An [SMSGate](https://sms-gate.app) account with API credentials
+- An Android device running the SMSGate app
+
+### Quick Setup
+
+1. Install the library with your preferred HTTP backend:
+   ```bash
+   pip install android-sms-gateway[requests]
+   ```
+
+2. Set environment variables:
+   ```bash
+   export API_LOGIN="your-login"
+   export API_PASSWORD="your-password"
+   ```
+
+3. Send your first message:
+   ```python
+   import os
+   from android_sms_gateway import client, domain
+
+   message = domain.Message(
+       phone_numbers=["+12025550100"],
+       text_message=domain.TextMessage(text="Hello from Python"),
+   )
+
+   with client.APIClient(os.getenv("API_LOGIN"), os.getenv("API_PASSWORD")) as c:
+       state = c.send(message)
+       print(f"Message ID: {state.id}")
+   ```
+
 ## 🔑 Authentication
 
 Two methods are supported: Basic authentication with account credentials, and JWT bearer tokens with scoped permissions. Pass `login=None` with a token to switch to JWT.
@@ -64,8 +106,8 @@ import os
 
 from android_sms_gateway import client, domain
 
-login = os.getenv("SMSGATE_LOGIN")
-password = os.getenv("SMSGATE_PASSWORD")
+login = os.getenv("API_LOGIN")
+password = os.getenv("API_PASSWORD")
 message = domain.Message(
     phone_numbers=["+12025550100"],
     text_message=domain.TextMessage(text="Hello from Python"),
@@ -101,7 +143,7 @@ message = domain.Message(
     with_delivery_report=True,
 )
 
-with client.APIClient(os.getenv("SMSGATE_LOGIN"), os.getenv("SMSGATE_PASSWORD")) as c:
+with client.APIClient(os.getenv("API_LOGIN"), os.getenv("API_PASSWORD")) as c:
     state = c.send(message)
     print(f"Message ID: {state.id}")
 ```
@@ -117,13 +159,37 @@ Beyond sending, the client covers message listing and cancellation, inbox listin
 - [Client libraries overview](https://docs.sms-gate.app/integration/client-libraries/)
 - [Client source](https://github.com/android-sms-gateway/client-py/blob/master/android_sms_gateway/client.py) - full method reference and examples
 
+## 🗺️ Roadmap
+
+- [ ] Add support for batch message sending
+- [ ] Implement message scheduling
+- [ ] Add webhook signature verification
+- [ ] Support for custom HTTP headers
+- [ ] Async context manager improvements
+
+See the [open issues](https://github.com/android-sms-gateway/client-py/issues) for a full list of proposed features and known issues.
+
 ## 🤝 Contributing
 
 Contributions are welcome. Open an issue to discuss major changes before submitting a pull request; PRs target the `master` branch.
 
+## 📞 Contact
+
+**Aleksandr Soloshenko** - admin@sms-gate.app
+
+Project Link: [https://github.com/android-sms-gateway/client-py](https://github.com/android-sms-gateway/client-py)
+
 ## 📄 License
 
 Distributed under the Apache License 2.0. See [LICENSE](https://github.com/android-sms-gateway/client-py/blob/master/LICENSE).
+
+## 🙏 Acknowledgments
+
+- [requests](https://docs.python-requests.org/) - HTTP library for sync requests
+- [aiohttp](https://docs.aiohttp.org/) - Async HTTP client/server
+- [httpx](https://www.python-httpx.org/) - Modern HTTP client for sync and async
+- [pycryptodome](https://pycryptodome.readthedocs.io/) - Cryptographic library for encryption
+- [Best README Template](https://github.com/othneildrew/Best-README-Template) - README structure inspiration
 
 <!-- Badge references: Shields.io style=for-the-badge is mandatory -->
 [contributors-shield]: https://img.shields.io/github/contributors/android-sms-gateway/client-py?style=for-the-badge
