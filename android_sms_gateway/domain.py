@@ -91,11 +91,16 @@ class Message:
                 return value.value
             return value
 
-        return {
+        result = {
             snake_to_camel(f.name): _serialize(getattr(self, f.name))
             for f in dataclasses.fields(self)
             if getattr(self, f.name) is not None
         }
+        # Go wire parity: Message.Priority has no omitempty and always
+        # serializes (zero value 0). Mirror client-go byte-for-byte.
+        if self.priority is None:
+            result["priority"] = MessagePriority.DEFAULT.value
+        return result
 
 
 @dataclasses.dataclass(frozen=True)
