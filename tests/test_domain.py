@@ -183,6 +183,7 @@ def test_webhook_asdict():
                 "phoneNumbers": ["123", "456"],
                 "withDeliveryReport": True,
                 "isEncrypted": False,
+                "priority": 0,
             },
         ),
         (
@@ -201,6 +202,7 @@ def test_webhook_asdict():
                 "isEncrypted": False,
                 "id": "msg_123",
                 "simNumber": 1,
+                "priority": 0,
             },
         ),
         (
@@ -253,7 +255,8 @@ def test_message_asdict(
 ):
     """
     Tests that a Message instance can be successfully converted to a dictionary
-    representation with camelCase keys and that only non-None fields are included.
+    representation with camelCase keys; non-None fields are included and
+    priority is always emitted (0 when unset, mirroring Go wire parity).
     Uses parametrized testing to cover multiple scenarios.
     """
     message = Message(
@@ -304,6 +307,7 @@ def test_message_serialization_with_data_message():
         "isEncrypted": False,
         "id": "msg_123",
         "deviceId": "device_001",
+        "priority": 0,
     }
 
     assert message.asdict() == expected_dict
