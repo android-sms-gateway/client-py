@@ -11,7 +11,7 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
 
 ## 📖 About
 
-`android-sms-gateway` is a typed Python library for the SMSGate 3rd-party API, with fully type-hinted domain models. It ships a synchronous `APIClient` and an asynchronous `AsyncAPIClient`, auto-detects the installed HTTP backend (`requests`, `aiohttp`, or `httpx`), and supports optional end-to-end message encryption via `Encryptor` (AES-256-CBC). Covers messages, inbox (refresh, attachments), devices, webhooks, settings, logs, health probes, and the JWT token lifecycle.
+`android-sms-gateway` is a typed Python library for the SMSGate 3rd-party API, with fully type-hinted domain models. It ships a synchronous `APIClient` and an asynchronous `AsyncAPIClient`, auto-detects the installed HTTP backend (`requests`, `aiohttp`, or `httpx`), and supports optional end-to-end message encryption via `Encryptor` (AES-256-CBC). Covers messages (SMS, data, and MMS), inbox (refresh, attachments), devices, webhooks, settings, logs, health probes, and the JWT token lifecycle.
 
 ## 📚 Table of Contents
 
@@ -36,6 +36,7 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
 - HTTP backends: `requests` (sync), `aiohttp` (async), `httpx` (both), auto-detected
 - Optional end-to-end encryption via `Encryptor` (AES-256-CBC)
 - Webhooks, devices, settings, logs, and health probes (live, ready, startup)
+- Outgoing MMS with subject, text, and base64 attachments via `MmsMessage` (E2E-encrypted when configured)
 - Inbox refresh with webhook delivery and MMS attachment download
 - Full type hints and typed exceptions (`APIError` subclasses)
 
