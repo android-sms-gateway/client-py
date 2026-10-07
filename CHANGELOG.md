@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.3.0] - Unreleased
+## [4.4.0] - Unreleased
+
+### Added
+
+- **`createdAt` in message state** — message state results now expose the moment the message was created, parsed from the API's ISO 8601 timestamp into a `datetime` (timezone-aware when the value carries a `Z` suffix) instead of leaving the creation time unavailable
+  ```python
+  from android_sms_gateway import client, domain
+
+  with client.APIClient(login, password) as c:
+      state = c.get_state("message-id")
+
+  print(state.created_at)  # datetime.datetime(..., tzinfo=datetime.timezone.utc)
+  ```
+
+  Responses that omit the field, send a null value, or send a malformed timestamp leave `state.created_at` as `None` rather than raising an error.
+
+## [4.3.0] - 2026-09-23
 
 ### Added
 
