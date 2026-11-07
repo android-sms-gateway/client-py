@@ -1,23 +1,31 @@
 import asyncio
+import base64
 import datetime
 import os
+import typing as t
+
 import pytest
+
+from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA
 
 from android_sms_gateway.client import APIClient, AsyncAPIClient
 from android_sms_gateway.constants import DEFAULT_URL
 from android_sms_gateway.domain import (
     Webhook,
     InboxRefreshRequest,
-    MessagesExportRequest,
     Message,
+    MessageState,
+    MessagesExportRequest,
     TextMessage,
     MmsAttachment,
     MmsMessage,
 )
-from android_sms_gateway.encryption import AESEncryptor
+from android_sms_gateway.encryption import AESEncryptor, PublicKeyEncryptor
 from android_sms_gateway.enums import WebhookDelivery, WebhookEvent
 from android_sms_gateway.http import RequestsHttpClient
 from android_sms_gateway import errors
+from tests.test_encryption import _decrypt_wrapped_key
 
 
 @pytest.fixture
@@ -534,3 +542,193 @@ def test_encrypt_already_encrypted_message_raises():
 
     with pytest.raises(ValueError, match="already encrypted"):
         client._encrypt(message)
+
+
+E2E_PREFIX = "$rsa-oaep-aes-256-gcm$"
+ECHOED_CIPHERTEXT = "$rsa-oaep-aes-256-gcm$v=1$k=1$QUFB$QUFB$QUFB"
+
+
+def _public_key_encryptor(
+    key_version: int = 1, device_id: t.Optional[str] = None
+) -> t.Tuple[PublicKeyEncryptor, RSA.RsaKey]:
+    """Builds an encryptor from a freshly generated RSA-2048 test key.
+
+    Returns the encryptor together with the private key so tests can
+    decrypt captured request payloads.
+    """
+    key = RSA.generate(2048)
+    spki = base64.b64encode(key.publickey().export_key(format="DER")).decode(
+        "ascii"
+    )
+    return (
+        PublicKeyEncryptor(spki, key_version=key_version, device_id=device_id),
+        key,
+    )
+
+
+def _decrypt_envelope(envelope: str, private_key: RSA.RsaKey) -> str:
+    """Unwraps and decrypts a `$rsa-oaep-aes-256-gcm$` envelope for assertions."""
+    chunks = envelope.split("$")
+    wrapped_key = base64.b64decode(chunks[4])
+    iv = base64.b64decode(chunks[5])
+    ct_tag = base64.b64decode(chunks[6])
+    aes_key = _decrypt_wrapped_key(wrapped_key, private_key)
+    cipher = AES.new(aes_key, AES.MODE_GCM, nonce=iv)
+    return cipher.decrypt_and_verify(ct_tag[:-16], ct_tag[-16:]).decode("utf-8")
+
+
+def _encrypted_message_state_response():
+    """Canned API response echoing the encrypted phone number verbatim."""
+    return {
+        "id": "msg_1",
+        "deviceId": "device_1",
+        "state": "Pending",
+        "isHashed": False,
+        "isEncrypted": True,
+        "recipients": [
+            {"phoneNumber": ECHOED_CIPHERTEXT, "state": "Pending"}
+        ],
+    }
+
+
+def test_send_encrypts_body_and_phones_and_keeps_state_encrypted():
+    """
+    send() with a PublicKeyEncryptor must encrypt the body and every phone
+    number, and must leave the response state untouched (ciphertext echo),
+    because the private key never leaves the device.
+    """
+    stub = StubHttpClient(_encrypted_message_state_response())
+    encryptor, private_key = _public_key_encryptor(device_id="device_1")
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        encryptor=encryptor,
+        http=stub,
+    )
+
+    state = client.send(
+        Message(
+            phone_numbers=["+79990001234"],
+            text_message=TextMessage("hello"),
+            device_id="device_1",
+        ),
+        skip_phone_validation=True,
+    )
+
+    assert len(stub.calls) == 1
+    assert stub.calls[0]["url"] == (
+        "https://example.com/messages?skipPhoneValidation=true"
+    )
+    payload = stub.calls[0]["payload"]
+    assert payload["isEncrypted"] is True
+    assert payload["deviceId"] == "device_1"
+    assert payload["textMessage"]["text"].startswith(E2E_PREFIX)
+    assert _decrypt_envelope(payload["textMessage"]["text"], private_key) == "hello"
+    assert payload["phoneNumbers"][0].startswith(E2E_PREFIX)
+
+    assert state.is_encrypted is True
+    assert state.recipients[0].phone_number == ECHOED_CIPHERTEXT
+
+
+def test_async_send_encrypts_body_and_phones_and_keeps_state_encrypted():
+    """
+    Async mirror of the E2E send contract: body and phones encrypted,
+    response state echoed as ciphertext.
+    """
+    stub = StubAsyncHttpClient(_encrypted_message_state_response())
+    encryptor, private_key = _public_key_encryptor(device_id="device_1")
+    client = AsyncAPIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        encryptor=encryptor,
+        http_client=stub,
+    )
+
+    state = asyncio.run(
+        client.send(
+            Message(
+                phone_numbers=["+79990001234"],
+                text_message=TextMessage("hello"),
+                device_id="device_1",
+            ),
+            skip_phone_validation=True,
+        )
+    )
+
+    assert len(stub.calls) == 1
+    payload = stub.calls[0]["payload"]
+    assert payload["isEncrypted"] is True
+    assert payload["deviceId"] == "device_1"
+    assert payload["textMessage"]["text"].startswith(E2E_PREFIX)
+    assert _decrypt_envelope(payload["textMessage"]["text"], private_key) == "hello"
+    assert payload["phoneNumbers"][0].startswith(E2E_PREFIX)
+
+    assert state.is_encrypted is True
+    assert state.recipients[0].phone_number == ECHOED_CIPHERTEXT
+
+
+@pytest.mark.parametrize("device_id", [None, "device_2"])
+def test_send_rejects_message_not_addressed_to_paired_device(device_id):
+    """
+    A device-paired encryptor must refuse sends that omit device_id or target
+    another device: the ciphertext would be undecryptable on the receiving
+    device (CodeRabbit major finding).
+    """
+    encryptor, _ = _public_key_encryptor(device_id="device_1")
+    stub = StubHttpClient(_encrypted_message_state_response())
+    client = APIClient(
+        "user",
+        "pass",
+        base_url="https://example.com",
+        encryptor=encryptor,
+        http=stub,
+    )
+    message = Message(
+        phone_numbers=["+79990001234"],
+        text_message=TextMessage("hello"),
+        device_id=device_id,
+    )
+
+    with pytest.raises(ValueError, match="paired device"):
+        client.send(message, skip_phone_validation=True)
+
+    assert stub.calls == []
+
+
+def test_decrypt_with_passphrase_encryptor_decrypts_recipients():
+    """
+    Regression lock for the can_decrypt skip: passphrase encryptors keep the
+    old behaviour of decrypting response recipients and clearing is_encrypted.
+    """
+    encryptor = AESEncryptor("correcthorsebatterystaple", iterations=1000)
+    encrypted_phone = encryptor.encrypt("+79990001234")
+    state = MessageState.from_dict(
+        {
+            "id": "msg_1",
+            "state": "Sent",
+            "isEncrypted": True,
+            "recipients": [
+                {"phoneNumber": encrypted_phone, "state": "Sent"}
+            ],
+        }
+    )
+    client = APIClient("user", "pass", encryptor=encryptor)
+
+    decrypted = client._decrypt(state)
+
+    assert decrypted.is_encrypted is False
+    assert decrypted.recipients[0].phone_number == "+79990001234"
+
+
+def test_decrypt_raises_for_encrypted_state_without_encryptor():
+    """
+    Regression lock: an encrypted response without any encryptor configured
+    must raise instead of silently returning ciphertext.
+    """
+    state = MessageState.from_dict(_encrypted_message_state_response())
+    client = APIClient("user", "pass")
+
+    with pytest.raises(ValueError, match="encryptor is not set"):
+        client._decrypt(state)
