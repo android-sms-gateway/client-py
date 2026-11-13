@@ -11,7 +11,7 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
 
 ## 📖 About
 
-`android-sms-gateway` is a typed Python library for the SMSGate 3rd-party API, with fully type-hinted domain models. It ships a synchronous `APIClient` and an asynchronous `AsyncAPIClient`, auto-detects the installed HTTP backend (`requests`, `aiohttp`, or `httpx`), and supports optional end-to-end message encryption via `Encryptor` (AES-256-CBC). Covers messages (SMS, data, and MMS), inbox (refresh, attachments), devices, webhooks, settings, logs, health probes, and the JWT token lifecycle.
+`android-sms-gateway` is a typed Python library for the SMSGate 3rd-party API, with fully type-hinted domain models. It ships a synchronous `APIClient` and an asynchronous `AsyncAPIClient`, auto-detects the installed HTTP backend (`requests`, `aiohttp`, or `httpx`), and supports optional end-to-end message encryption via `Encryptor` (AES-256-CBC) or the device-paired `PublicKeyEncryptor` (RSA-OAEP + AES-256-GCM). Covers messages (SMS, data, and MMS), inbox (refresh, attachments), devices, webhooks, settings, logs, health probes, and the JWT token lifecycle.
 
 ## 📚 Table of Contents
 
@@ -26,6 +26,8 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
   - [🔑 Authentication](#-authentication)
     - [Basic Authentication](#basic-authentication)
     - [JWT Authentication](#jwt-authentication)
+  - [🔒 Encryption](#-encryption)
+    - [Device-paired encryption](#device-paired-encryption)
   - [💻 Usage](#-usage)
   - [📖 API Reference](#-api-reference)
   - [🗺️ Roadmap](#️-roadmap)
@@ -39,8 +41,8 @@ A modern Python client for the [SMSGate](https://sms-gate.app) API: send SMS mes
 - Synchronous `APIClient` and asynchronous `AsyncAPIClient` (context managers)
 - Basic and JWT authentication; token generate, refresh, and revoke
 - HTTP backends: `requests` (sync), `aiohttp` (async), `httpx` (both), auto-detected
-- Optional end-to-end encryption via `Encryptor` (AES-256-CBC)
-- Webhooks, devices, settings, logs, and health probes (live, ready, startup)
+- Optional end-to-end encryption: passphrase `Encryptor` (AES-256-CBC) or device-paired `PublicKeyEncryptor` (RSA-OAEP + AES-256-GCM, encrypt-only)
+- Webhooks, devices, settings, logs, and health probes (health, liveness, readiness, startup)
 - Outgoing MMS with subject, text, and base64 attachments via `MmsMessage` (E2E-encrypted when configured)
 - Inbox refresh with webhook delivery and MMS attachment download
 - Full type hints and typed exceptions (`APIError` subclasses)
@@ -129,6 +131,64 @@ with client.APIClient(login, password) as c:
 
 jwt_client = client.APIClient(None, token.access_token)
 ```
+
+## 🔒 Encryption
+
+Optional end-to-end encryption requires the `encryption` extra (`pip install android-sms-gateway[encryption]`). Pass an encryptor via `encryptor=` to `APIClient` or `AsyncAPIClient`; outgoing message content, phone numbers, and MMS attachments are then encrypted before send.
+
+Two encryptors are available:
+
+- **`Encryptor(passphrase)`** — passphrase-based AES-256-CBC (PBKDF2-SHA1). Can both encrypt and decrypt, so encrypted recipient phone numbers in responses are decrypted automatically.
+- **`PublicKeyEncryptor`** — device-paired RSA-OAEP + AES-256-GCM, built from the device's E2E public key. Encrypt-only: the private key never leaves the Android device, so `decrypt()` raises and encrypted recipient numbers in responses are returned unchanged.
+
+### Device-paired encryption
+
+```python
+import base64
+import hashlib
+
+from android_sms_gateway import PublicKeyEncryptor, client, domain
+
+PINNED_DEVICE_ID = "your-device-id"
+PINNED_FINGERPRINT = "A1B2:C3D4:E5F6:7890:ABCD:EF12:3456:7890:1111:2222:3333:4444:5555:6666:7777:8888"
+
+
+def key_fingerprint(public_key: str) -> str:
+    digest = hashlib.sha256(base64.b64decode(public_key)).hexdigest().upper()
+    return ":".join(digest[i : i + 4] for i in range(0, 64, 4))
+
+
+with client.APIClient(login, password) as c:
+    device = next((d for d in c.list_devices() if d.id == PINNED_DEVICE_ID), None)
+
+if device is None:
+    raise RuntimeError("Pinned device not found")
+
+if (
+    device.public_key is None
+    or key_fingerprint(device.public_key) != PINNED_FINGERPRINT
+):
+    raise RuntimeError("Device key changed; re-verify it out of band before sending")
+
+encryptor = PublicKeyEncryptor.from_device(device)
+
+message = domain.Message(
+    device_id=device.id,
+    phone_numbers=["+12025550100"],
+    text_message=domain.TextMessage(text="Hello from Python"),
+)
+
+with client.APIClient(login, password, encryptor=encryptor) as c:
+    state = c.send(message)
+```
+
+The values pinned above come from the device itself (Settings → Device → Device Key): the key fingerprint, rendered as uppercase hex in 16 colon-separated groups of 4. The key returned by `list_devices()` is published through the server, so treat it as untrusted until verified: keep the pinned value stored outside the server and fail closed when changes. See the [key verification procedure](https://docs.sms-gate.app/privacy/encryption/#trust-model-and-key-verification) for details.
+
+Rules enforced by the client:
+
+- `from_device` raises `ValueError` if the device has no E2E public key (`public_key` / `key_version` unset).
+- If the encryptor has a `device_id`, `message.device_id` must match it, otherwise `send` raises `ValueError`. `from_device` sets this ID; direct construction defaults to `None` and disables the check.
+- Requesting state for an encrypted message without an encryptor set raises `ValueError`.
 
 ## 💻 Usage
 
