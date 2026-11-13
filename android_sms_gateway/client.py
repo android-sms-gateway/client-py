@@ -46,6 +46,14 @@ class BaseClient(abc.ABC):
         if message.is_encrypted:
             raise ValueError("Message is already encrypted")
 
+        if (
+            self.encryptor.device_id is not None
+            and message.device_id != self.encryptor.device_id
+        ):
+            raise ValueError(
+                "Message device_id does not match the encryptor's paired device"
+            )
+
         message = dataclasses.replace(
             message,
             is_encrypted=True,
@@ -108,7 +116,7 @@ class BaseClient(abc.ABC):
         if state.is_encrypted and self.encryptor is None:
             raise ValueError("Message is encrypted but encryptor is not set")
 
-        if self.encryptor is None:
+        if self.encryptor is None or not self.encryptor.can_decrypt:
             return state
 
         return dataclasses.replace(

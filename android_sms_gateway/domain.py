@@ -343,6 +343,10 @@ class Device:
     """The timestamp when the device was deleted."""
     last_seen: t.Optional[datetime.datetime] = None
     """The timestamp when the device was last seen."""
+    public_key: t.Optional[str] = None
+    """Base64-encoded X.509 SPKI RSA public key for E2E encryption (nullable)."""
+    key_version: t.Optional[int] = None
+    """The version of the E2E key pair (nullable, required with `public_key`)."""
 
     @classmethod
     def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Device":
@@ -354,6 +358,8 @@ class Device:
             updated_at=_parse_iso(payload.get("updatedAt")),
             deleted_at=_parse_iso(payload.get("deletedAt")),
             last_seen=_parse_iso(payload.get("lastSeen")),
+            public_key=payload.get("publicKey"),
+            key_version=payload.get("keyVersion"),
         )
 
 

@@ -4,6 +4,7 @@ import datetime
 
 from android_sms_gateway.enums import WebhookEvent, MessagePriority, WebhookDelivery
 from android_sms_gateway.domain import (
+    Device,
     MessageState,
     RecipientState,
     Webhook,
@@ -148,6 +149,27 @@ def test_message_state_created_at_malformed_does_not_crash():
     message_state = MessageState.from_dict(payload)
 
     assert message_state.created_at is None
+
+
+def test_device_from_dict_with_public_key():
+    payload = {
+        "id": "device-1",
+        "name": "ZTE/BLADE",
+        "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAASC",
+        "keyVersion": 2,
+    }
+
+    device = Device.from_dict(payload)
+
+    assert device.public_key == payload["publicKey"]
+    assert device.key_version == payload["keyVersion"]
+
+
+def test_device_from_dict_without_public_key():
+    device = Device.from_dict({"id": "device-1", "name": "ZTE/BLADE"})
+
+    assert device.public_key is None
+    assert device.key_version is None
 
 
 def test_webhook_from_dict():

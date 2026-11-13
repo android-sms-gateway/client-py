@@ -40,7 +40,7 @@ from .webhooks import (
     SmsDataReceivedPayload,
     SmsReceivedPayload,
 )
-from .encryption import Encryptor
+from .encryption import Encryptor, PublicKeyEncryptor
 from .enums import (
     HealthStatus,
     LimitPeriod,
@@ -85,6 +85,7 @@ __all__ = (
     "MmsDownloadedPayload",
     "MmsReceivedPayload",
     "ProcessState",
+    "PublicKeyEncryptor",
     "QueryPagination",
     "RecipientState",
     "SettingsEncryption",
