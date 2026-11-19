@@ -2,7 +2,12 @@ import json
 import pytest
 import datetime
 
-from android_sms_gateway.enums import WebhookEvent, MessagePriority, WebhookDelivery
+from android_sms_gateway.enums import (
+    DeviceState,
+    WebhookEvent,
+    MessagePriority,
+    WebhookDelivery,
+)
 from android_sms_gateway.domain import (
     Device,
     MessageState,
@@ -170,6 +175,17 @@ def test_device_from_dict_without_public_key():
 
     assert device.public_key is None
     assert device.key_version is None
+
+
+def test_device_from_dict_with_state():
+    assert Device.from_dict({"id": "device-1", "name": "ZTE/BLADE", "state": "Disabled"}).state == DeviceState.DISABLED
+    assert Device.from_dict({"id": "device-1", "name": "ZTE/BLADE", "state": "Active"}).state == DeviceState.ACTIVE
+
+
+def test_device_from_dict_without_state():
+    device = Device.from_dict({"id": "device-1", "name": "ZTE/BLADE"})
+
+    assert device.state is None
 
 
 def test_webhook_from_dict():
