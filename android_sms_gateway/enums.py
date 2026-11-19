@@ -154,3 +154,13 @@ class LogEntryPriority(enum.Enum):
 
     ERROR = "ERROR"
     """Error level."""
+
+
+class DeviceState(enum.Enum):
+    """State of a registered device."""
+
+    ACTIVE = "Active"
+    """Device is available for selection."""
+
+    DISABLED = "Disabled"
+    """Device is excluded from message selection."""

@@ -15,6 +15,7 @@ from .enums import (
     MessagesProcessingOrder,
     HealthStatus,
     LogEntryPriority,
+    DeviceState,
 )
 from .webhooks import (  # noqa: F401  re-exported for backward compatibility
     MmsDownloadedAttachment,
@@ -347,10 +348,15 @@ class Device:
     """Base64-encoded X.509 SPKI RSA public key for E2E encryption (nullable)."""
     key_version: t.Optional[int] = None
     """The version of the E2E key pair (nullable, required with `public_key`)."""
+    state: t.Optional[DeviceState] = None
+    """The state of the device (nullable for servers that do not report it)."""
 
     @classmethod
     def from_dict(cls, payload: t.Dict[str, t.Any]) -> "Device":
         """Creates a Device instance from a dictionary."""
+        raw_state = payload.get("state")
+        state = DeviceState(raw_state) if isinstance(raw_state, str) else None
+
         return cls(
             id=payload["id"],
             name=payload["name"],
@@ -360,6 +366,7 @@ class Device:
             last_seen=_parse_iso(payload.get("lastSeen")),
             public_key=payload.get("publicKey"),
             key_version=payload.get("keyVersion"),
+            state=state,
         )
 
 

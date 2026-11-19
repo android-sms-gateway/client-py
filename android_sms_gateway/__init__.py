@@ -42,6 +42,7 @@ from .webhooks import (
 )
 from .encryption import Encryptor, PublicKeyEncryptor
 from .enums import (
+    DeviceState,
     HealthStatus,
     LimitPeriod,
     LogEntryPriority,
@@ -61,6 +62,7 @@ __all__ = (
     "DataMessage",
     "Device",
     "DeviceSettings",
+    "DeviceState",
     "Encryptor",
     "HealthCheck",
     "HealthResponse",
